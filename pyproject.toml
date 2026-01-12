@@ -17,5 +17,9 @@ dependencies = [
     "python-decouple == 3.8"
 ]
 
+[project.scripts]
+frcm = "frcm:console_main"
 
-
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
