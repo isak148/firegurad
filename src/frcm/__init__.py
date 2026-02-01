@@ -1,5 +1,7 @@
 from frcm.datamodel.model import WeatherData, WeatherDataPoint, FireRisk, FireRiskPrediction
 from frcm.fireriskmodel.compute import compute
+from frcm.met_integration.client import METClient
+from frcm.met_integration.transform import transform_met_to_weather_data, fetch_and_transform_weather_data
 import sys
 from pathlib import Path
 
