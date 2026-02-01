@@ -1,1 +1,1 @@
-"""Tests for MET integration module."""
+"""Tests for the FRCM package."""
