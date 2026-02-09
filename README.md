@@ -1,5 +1,7 @@
 # DYNAMIC Fire risk indicator implementation
 
+[![CI](https://github.com/isak148/firegurad/workflows/CI/badge.svg)](https://github.com/isak148/firegurad/actions/workflows/ci.yml)
+
 This repository contains a _simplified version_ the implementation of the dynamic fire risk indicator
 described in the submitted paper:
 
@@ -17,6 +19,9 @@ provides the resulting fire risk as _time to flashover (ttf)_.
 - **REST API**: HTTP endpoint for third-party developers to get fire risk predictions by coordinates
 
 See [API_README.md](API_README.md) for detailed API documentation.
+- **Database Caching**: Automatically caches weather data and computed fire risk results to minimize redundant computations
+- **Efficient Storage**: Uses SQLite database to store both input weather data and calculated fire hazard results
+- **Hash-based Lookup**: Identifies duplicate weather data sets using SHA-256 hashing for instant cache retrieval
 
 
 # Installation
@@ -52,12 +57,36 @@ python3 -m uvicorn frcm.api:app --host 0.0.0.0 --port 8000
 
 See [API_README.md](API_README.md) for complete API documentation and usage examples.
 
+## Database Caching
+
+The application automatically caches weather data and fire risk predictions in a SQLite database (`frcm_cache.db`).
+When the same weather data is processed again, the cached results are retrieved instantly instead of recalculating.
+
+The caching system:
+- Stores weather data with a unique hash based on the data content
+- Caches fire risk predictions linked to their corresponding weather data
+- Automatically checks for cached results before performing calculations
+- Uses minimal disk space with efficient SQLite storage
+
+On first run with a dataset:
+```
+Computing new fire risk prediction (hash: 4c2a1af09503b8aa...)
+```
+
+On subsequent runs with the same dataset:
+```
+Using cached fire risk prediction (hash: 4c2a1af09503b8aa...)
+```
+
 # Overview
 
 The implementation is organised into the following main folders:
 
 - `datamodel` - contains an implementation of the data model used for weather data and fire risk indications.
 - `fireriskmodel` contains an implementation of the underlying fire risk model.
+- `database` - contains the database implementation for caching weather data and fire risk predictions.
 
 The central method of the application is the method `compute()` in `fireriskmodel.compute`.
+For cached computation, use `compute_with_cache()` from `fireriskmodel.compute_cached`.
+
 
