@@ -1,5 +1,7 @@
 # DYNAMIC Fire risk indicator implementation
 
+[![CI](https://github.com/isak148/firegurad/workflows/CI/badge.svg)](https://github.com/isak148/firegurad/actions/workflows/ci.yml)
+
 This repository contains a _simplified version_ the implementation of the dynamic fire risk indicator
 described in the submitted paper:
 
@@ -14,6 +16,11 @@ provides the resulting fire risk as _time to flashover (ttf)_.
 ## New: MET API Integration
 
 This repository now includes integration with the Meteorologisk institutt (MET) API, enabling automatic weather data fetching instead of relying solely on CSV files. See [MET Integration Documentation](src/frcm/met_integration/README.md) for details.
+## Features
+
+- **Database Caching**: Automatically caches weather data and computed fire risk results to minimize redundant computations
+- **Efficient Storage**: Uses SQLite database to store both input weather data and calculated fire hazard results
+- **Hash-based Lookup**: Identifies duplicate weather data sets using SHA-256 hashing for instant cache retrieval
 
 
 # Installation
@@ -39,15 +46,49 @@ uv run python src/frcm/__main__.py ./bergen_2026_01_09.csv
 
 where `./bergen_2026_01_09.csv` is an example CSV demostrating the input format which comes bundled with this repo.
 
+## Database Caching
+
+The application automatically caches weather data and fire risk predictions in a SQLite database (`frcm_cache.db`).
+When the same weather data is processed again, the cached results are retrieved instantly instead of recalculating.
+
+The caching system:
+- Stores weather data with a unique hash based on the data content
+- Caches fire risk predictions linked to their corresponding weather data
+- Automatically checks for cached results before performing calculations
+- Uses minimal disk space with efficient SQLite storage
+
+On first run with a dataset:
+```
+Computing new fire risk prediction (hash: 4c2a1af09503b8aa...)
+```
+
+On subsequent runs with the same dataset:
+```
+Using cached fire risk prediction (hash: 4c2a1af09503b8aa...)
+```
+
 # Overview
 
 The implementation is organised into the following main folders:
 
 - `datamodel` - contains an implementation of the data model used for weather data and fire risk indications.
-- `fireriskmodel` - contains an implementation of the underlying fire risk model.
-- `met_integration` - contains the MET API client and data transformation logic for automatic weather data fetching.
+- `fireriskmodel` contains an implementation of the underlying fire risk model.
+- `database` - contains the database implementation for caching weather data and fire risk predictions.
 
 The central method of the application is the method `compute()` in `fireriskmodel.compute`.
+For cached computation, use `compute_with_cache()` from `fireriskmodel.compute_cached`.
+
+
+# System Architecture
+
+For information about the complete FireGuard system architecture, including integration with MET API, database, message queues, and REST API endpoints, please see the [Architecture Documentation](docs/architecture.md).
+
+The architecture documentation includes:
+- System component overview
+- Data flow diagrams
+- Deployment architecture
+- Technology stack recommendations
+- API specifications
 
 ## Usage Examples
 
