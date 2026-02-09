@@ -236,6 +236,141 @@ mosquitto_sub -h localhost -t frcm/fire-danger
 ```
 
 
+# REST API
+
+This repository now includes a secure REST API for accessing the fire risk calculation functionality over HTTPS with authentication.
+
+## Features
+
+- **HTTPS Encryption**: All API communication is encrypted using TLS/SSL
+- **API Key Authentication**: Protect endpoints with API key-based authentication
+- **Self-signed Certificate Generation**: Automatic generation of SSL certificates for development
+- **FastAPI Framework**: Modern, fast, and well-documented API framework
+- **Interactive Documentation**: Swagger UI and ReDoc available at `/docs` and `/redoc`
+
+## API Installation
+
+Install the required dependencies:
+
+```shell
+uv sync
+```
+
+## Configuration
+
+Create a `.env` file based on the provided `.env.example`:
+
+```shell
+cp .env.example .env
+```
+
+Edit the `.env` file to configure:
+
+- `FRCM_API_KEYS`: Comma-separated list of valid API keys (e.g., `key1,key2,key3`)
+- `FRCM_HOST`: Server host (default: `0.0.0.0`)
+- `FRCM_PORT`: Server port (default: `8443`)
+- `FRCM_SSL_CERT`: Path to SSL certificate (default: `./ssl/cert.pem`)
+- `FRCM_SSL_KEY`: Path to SSL private key (default: `./ssl/key.pem`)
+- `FRCM_REQUIRE_HTTPS`: Enable/disable HTTPS (default: `True`)
+
+**Important**: For production use, always:
+1. Set strong, random API keys
+2. Use properly signed SSL certificates (not self-signed)
+3. Keep HTTPS enabled (`FRCM_REQUIRE_HTTPS=True`)
+
+## Starting the API Server
+
+Start the API server with:
+
+```shell
+uv run frcm-api
+```
+
+Or directly:
+
+```shell
+uv run python -m frcm.api.server
+```
+
+The server will:
+1. Check for SSL certificates (generate self-signed if missing)
+2. Start on the configured port with HTTPS enabled
+3. Require API key authentication for protected endpoints
+
+## Using the API
+
+### Health Check (No Authentication Required)
+
+```bash
+curl -k https://localhost:8443/health
+```
+
+### Calculate Fire Risk (Authentication Required)
+
+```bash
+curl -k -X POST https://localhost:8443/calculate \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your-secret-api-key-1" \
+  -d '{
+    "data": [
+      {
+        "timestamp": "2026-01-09T00:00:00",
+        "temperature": 5.5,
+        "humidity": 0.85,
+        "wind_speed": 3.2
+      },
+      {
+        "timestamp": "2026-01-09T01:00:00",
+        "temperature": 5.2,
+        "humidity": 0.87,
+        "wind_speed": 3.0
+      }
+    ]
+  }'
+```
+
+### API Documentation
+
+Access the interactive API documentation at:
+- Swagger UI: `https://localhost:8443/docs`
+- ReDoc: `https://localhost:8443/redoc`
+
+**Note**: Use `-k` flag with curl to accept self-signed certificates in development.
+
+## Security Notes
+
+### Development vs Production
+
+**Development**:
+- Self-signed certificates are acceptable
+- Can use simple API keys for testing
+- HTTPS can be disabled for local testing (not recommended)
+
+**Production**:
+- Use certificates from a trusted Certificate Authority (Let's Encrypt, DigiCert, etc.)
+- Use strong, randomly generated API keys
+- Always enable HTTPS
+- Consider implementing rate limiting
+- Use environment variables or secret management systems for configuration
+- Monitor API access logs
+- Consider implementing OAuth2 for more advanced authentication needs
+
+### Disabling HTTPS (Not Recommended)
+
+For local development only, you can disable HTTPS:
+
+```bash
+export FRCM_REQUIRE_HTTPS=False
+export FRCM_PORT=8080
+uv run frcm-api
+```
+
+Then access via HTTP:
+```bash
+curl http://localhost:8080/health
+```
+
+**Warning**: Never disable HTTPS in production environments.
 # Usage
 
 ## Manual Calculation from CSV

@@ -17,11 +17,16 @@ dependencies = [
     "requests == 2.31.0",
     "python-decouple == 3.8",
     "pydantic-core>=2.14.6",
+    "fastapi >= 0.115.0",
+    "uvicorn[standard] >= 0.32.0",
+    "python-multipart >= 0.0.22",
+    "httpx >= 0.24.0",
     "paho-mqtt >= 1.6.1",
 ]
 
 [project.scripts]
 frcm = "frcm:console_main"
+frcm-api = "frcm.api.server:main"
 
 [build-system]
 requires = ["setuptools"]
