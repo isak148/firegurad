@@ -11,6 +11,13 @@ and the more complex API).
 The calculation takes a CSV dataset containing time, temperature, relative humidity, and wind speed data points and 
 provides the resulting fire risk as _time to flashover (ttf)_.
 
+## Features
+
+- **Command-line interface**: Process CSV files with weather data
+- **REST API**: HTTP endpoint for third-party developers to get fire risk predictions by coordinates
+
+See [API_README.md](API_README.md) for detailed API documentation.
+
 
 # Installation
 
@@ -34,6 +41,16 @@ uv run python src/frcm/__main__.py ./bergen_2026_01_09.csv
 ```
 
 where `./bergen_2026_01_09.csv` is an example CSV demostrating the input format which comes bundled with this repo.
+
+# REST API
+
+To run the REST API server:
+
+```bash
+python3 -m uvicorn frcm.api:app --host 0.0.0.0 --port 8000
+```
+
+See [API_README.md](API_README.md) for complete API documentation and usage examples.
 
 # Overview
 
