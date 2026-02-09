@@ -60,7 +60,7 @@ def fetch_weather_data(latitude: float, longitude: float, days_ahead: int) -> We
     url = "https://api.met.no/weatherapi/locationforecast/2.0/compact"
     
     headers = {
-        "User-Agent": "FireRisk/0.1.0 github.com/isak148/firegurad"
+        "User-Agent": "FireRisk/0.1.0 github.com/isak148/fireguard"
     }
     
     params = {

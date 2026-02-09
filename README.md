@@ -40,7 +40,7 @@ Alternatively you can test FRCM directly by running:
 uv run python src/frcm/__main__.py ./bergen_2026_01_09.csv
 ```
 
-where `./bergen_2026_01_09.csv` is an example CSV demostrating the input format which comes bundled with this repo.
+where `./bergen_2026_01_09.csv` is an example CSV demonstrating the input format which comes bundled with this repo.
 
 # REST API
 
