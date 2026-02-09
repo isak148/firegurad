@@ -1,0 +1,22 @@
+{
+  "locations": [
+    {
+      "name": "Bergen",
+      "latitude": 60.3913,
+      "longitude": 5.3221,
+      "altitude": 12
+    },
+    {
+      "name": "Oslo",
+      "latitude": 59.9139,
+      "longitude": 10.7522,
+      "altitude": 23
+    },
+    {
+      "name": "Trondheim",
+      "latitude": 63.4305,
+      "longitude": 10.3951,
+      "altitude": 5
+    }
+  ]
+}
