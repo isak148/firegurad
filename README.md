@@ -76,3 +76,14 @@ The central method of the application is the method `compute()` in `fireriskmode
 For cached computation, use `compute_with_cache()` from `fireriskmodel.compute_cached`.
 
 
+# System Architecture
+
+For information about the complete FireGuard system architecture, including integration with MET API, database, message queues, and REST API endpoints, please see the [Architecture Documentation](docs/architecture.md).
+
+The architecture documentation includes:
+- System component overview
+- Data flow diagrams
+- Deployment architecture
+- Technology stack recommendations
+- API specifications
+
