@@ -53,6 +53,19 @@ See [API_README.md](API_README.md) for detailed API documentation.
 
 ## Installation
 
+### Using Docker (Recommended)
+
+The easiest way to run FireGuard is using Docker. See [DOCKER.md](DOCKER.md) for detailed instructions.
+
+Quick start:
+```bash
+cp .env.example .env
+# Edit .env to set your API keys
+docker compose up -d
+```
+
+### Using uv (Development)
+
 The project is based on using [uv](https://docs.astral.sh/uv/) as the package manager.
 If you want to build this project on you own, make sure that [uv is installed correctly](https://docs.astral.sh/uv/getting-started/installation/).
 

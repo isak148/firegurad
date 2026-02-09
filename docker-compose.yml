@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  frcm-api:
+    build: .
+    container_name: frcm-api
+    ports:
+      - "8443:8443"
+    environment:
+      - FRCM_HOST=0.0.0.0
+      - FRCM_PORT=8443
+      - FRCM_SSL_CERT=/app/ssl/cert.pem
+      - FRCM_SSL_KEY=/app/ssl/key.pem
+      - FRCM_REQUIRE_HTTPS=True
+    env_file:
+      - .env
+    volumes:
+      # Mount SSL certificates directory
+      - ./ssl:/app/ssl
+      # Mount cache database for persistence
+      - ./data:/app/data
+    restart: unless-stopped
+    networks:
+      - frcm-network
+
+  # Optional: MQTT broker for notifications
+  mqtt-broker:
+    image: eclipse-mosquitto:latest
+    container_name: frcm-mqtt
+    ports:
+      - "1883:1883"
+      - "9001:9001"
+    volumes:
+      - ./mosquitto/config:/mosquitto/config
+      - ./mosquitto/data:/mosquitto/data
+      - ./mosquitto/log:/mosquitto/log
+    restart: unless-stopped
+    networks:
+      - frcm-network
+    profiles:
+      - with-mqtt
+
+networks:
+  frcm-network:
+    driver: bridge
