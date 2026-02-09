@@ -1,0 +1,80 @@
+# Git
+.git
+.github
+.gitignore
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+nosetests.xml
+coverage.xml
+*.cover
+
+# IDEs
+.idea
+.vscode
+*.swp
+*.swo
+*~
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Example files
+examples/
+example_output/
+bergen_2026_01_09.csv
+locations_example.json
+example_worker_usage.py
+
+# Database and cache
+frcm_cache.db
+*.db
+
+# SSL certificates (will be generated or mounted)
+ssl/
+*.pem
+*.key
+*.crt
+*.csr
+
+# Data directories
+data/
+mosquitto/
+
+# Temporary files
+tmp/
+*.tmp
+*.log
