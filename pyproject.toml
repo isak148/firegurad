@@ -30,6 +30,12 @@ dependencies = [
 frcm = "frcm:console_main"
 frcm-api = "frcm.api.server:main"
 
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
