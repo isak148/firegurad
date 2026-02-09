@@ -8,9 +8,10 @@ described in the submitted paper:
 > R.D: Strand and L.M. Kristensen. [*An implementation, evaluation and validation of a dynamic fire and conflagration risk indicator for wooden homes*](https://doi.org/10.1016/j.procs.2024.05.195).
 
 Compared to the [original version](https://github.com/webminz/dynamic-frcm), this repository
-only contains the **fire risk calculation** itself (without the hard-wired integration with the https://met.no integration
-and the more complex API).
-The calculation takes a CSV dataset containing time, temperature, relative humidity, and wind speed data points and 
+contains the **fire risk calculation** itself as well as a **weather data harvester** that automatically fetches
+data from https://api.met.no for selected locations.
+
+The calculation takes weather data (time, temperature, relative humidity, and wind speed) and 
 provides the resulting fire risk as _time to flashover (ttf)_.
 
 ## New: MET API Integration
@@ -72,6 +73,7 @@ Using cached fire risk prediction (hash: 4c2a1af09503b8aa...)
 The implementation is organised into the following main folders:
 
 - `datamodel` - contains an implementation of the data model used for weather data and fire risk indications.
+- `worker` - contains the weather data harvester for automatically fetching data from api.met.no.
 - `fireriskmodel` contains an implementation of the underlying fire risk model.
 - `notification` - contains the notification service for publishing fire danger changes.
 - `database` - contains the database implementation for caching weather data and fire risk predictions.
@@ -185,5 +187,59 @@ Subscribe to notifications:
 ```bash
 mosquitto_sub -h localhost -t frcm/fire-danger
 ```
+
+
+# Usage
+
+## Manual Calculation from CSV
+
+You can calculate fire risk from a CSV file containing weather data:
+
+```shell
+python -m frcm ./bergen_2026_01_09.csv [output.csv]
+```
+
+The CSV file should have the format:
+```
+timestamp,temperature,humidity,wind_speed
+2026-01-07T00:00:00+00:00,-9.7,85.0,0.8
+```
+
+## Automatic Weather Data Harvesting
+
+The worker module automatically fetches weather data from the Norwegian Meteorological Institute (api.met.no)
+for configured locations and computes fire risk predictions:
+
+1. Create a locations configuration file (`locations.json`):
+```json
+{
+  "locations": [
+    {
+      "name": "Bergen",
+      "latitude": 60.3913,
+      "longitude": 5.3221,
+      "altitude": 12
+    },
+    {
+      "name": "Oslo",
+      "latitude": 59.9139,
+      "longitude": 10.7522,
+      "altitude": 23
+    }
+  ]
+}
+```
+
+2. Run the worker:
+```shell
+python -m frcm.worker locations.json [output_dir]
+```
+
+This will:
+- Fetch weather forecasts for each location from api.met.no
+- Compute fire risk predictions
+- Save results as CSV files: `{location}_weather.csv` and `{location}_firerisk.csv`
+
+See `src/frcm/worker/README.md` for more details and programmatic usage examples.
 
 
