@@ -36,6 +36,10 @@ provides the resulting fire risk as _time to flashover (ttf)_.
 This repository now includes integration with the Meteorologisk institutt (MET) API, enabling automatic weather data fetching instead of relying solely on CSV files. See [MET Integration Documentation](src/frcm/met_integration/README.md) for details.
 ## Features
 
+- **Command-line interface**: Process CSV files with weather data
+- **REST API**: HTTP endpoint for third-party developers to get fire risk predictions by coordinates
+
+See [API_README.md](API_README.md) for detailed API documentation.
 - **Database Caching**: Automatically caches weather data and computed fire risk results to minimize redundant computations
 - **Efficient Storage**: Uses SQLite database to store both input weather data and calculated fire hazard results
 - **Hash-based Lookup**: Identifies duplicate weather data sets using SHA-256 hashing for instant cache retrieval
@@ -68,7 +72,17 @@ Alternatively you can test FRCM directly by running:
 uv run python src/frcm/__main__.py ./bergen_2026_01_09.csv
 ```
 
-where `./bergen_2026_01_09.csv` is an example CSV demostrating the input format which comes bundled with this repo.
+where `./bergen_2026_01_09.csv` is an example CSV demonstrating the input format which comes bundled with this repo.
+
+# REST API
+
+To run the REST API server:
+
+```bash
+python3 -m uvicorn frcm.api:app --host 0.0.0.0 --port 8000
+```
+
+See [API_README.md](API_README.md) for complete API documentation and usage examples.
 
 ## Overview
 ## Database Caching

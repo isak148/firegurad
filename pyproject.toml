@@ -17,6 +17,8 @@ dependencies = [
     "requests == 2.31.0",
     "python-decouple == 3.8",
     "pydantic-core>=2.14.6",
+    "fastapi >=0.115.0",
+    "uvicorn >=0.30.0",
     "fastapi >= 0.115.0",
     "uvicorn[standard] >= 0.32.0",
     "python-multipart >= 0.0.22",
