@@ -13,6 +13,9 @@ and the more complex API).
 The calculation takes a CSV dataset containing time, temperature, relative humidity, and wind speed data points and 
 provides the resulting fire risk as _time to flashover (ttf)_.
 
+## New: MET API Integration
+
+This repository now includes integration with the Meteorologisk institutt (MET) API, enabling automatic weather data fetching instead of relying solely on CSV files. See [MET Integration Documentation](src/frcm/met_integration/README.md) for details.
 ## Features
 
 - **Database Caching**: Automatically caches weather data and computed fire risk results to minimize redundant computations
@@ -86,4 +89,27 @@ The architecture documentation includes:
 - Deployment architecture
 - Technology stack recommendations
 - API specifications
+
+## Usage Examples
+
+### Using CSV file (original method)
+
+```shell
+uv run python src/frcm/__main__.py ./bergen_2026_01_09.csv
+```
+
+### Using MET API (new method)
+
+```python
+from frcm import fetch_and_transform_weather_data, compute
+
+# Fetch weather data for a location
+weather_data = fetch_and_transform_weather_data(latitude=60.39, longitude=5.32)
+
+# Compute fire risk
+fire_risks = compute(weather_data)
+print(fire_risks)
+```
+
+See `examples/met_api_example.py` for a complete example.
 
