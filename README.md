@@ -1,16 +1,16 @@
-# 🔥 FireGuard
+# FireGuard
 
 **FireGuard** is a dynamic fire risk assessment system that provides real-time fire risk calculations for wooden homes based on weather conditions.
 
-## 🎯 Vision
+## Vision
 
 FireGuard aims to provide an accessible, API-driven platform for calculating dynamic fire risk indicators. By integrating meteorological data and advanced fire risk modeling, we empower developers, researchers, and safety organizations to build applications that enhance fire safety awareness and prevention.
 
-## 📚 Quick Links
+## Quick Links
 
-- **📖 Documentation**: [Technical implementation details](#overview) (see below)
-- **💻 Source Code**: [GitHub Repository](https://github.com/isak148/firegurad)
-- **📋 Backlog**: [GitHub Issues & Project Board](https://github.com/isak148/firegurad/issues)
+- ** Documentation**: [Technical implementation details](#overview) (see below)
+- ** Source Code**: [GitHub Repository](https://github.com/isak148/firegurad)
+- ** Backlog**: [GitHub Issues & Project Board](https://github.com/isak148/firegurad/issues)
 
 ---
 
@@ -27,7 +27,7 @@ and the more complex API).
 The calculation takes a CSV dataset containing time, temperature, relative humidity, and wind speed data points and 
 provides the resulting fire risk as _time to flashover (ttf)_.
 
-## ✨ Features
+##  Features
 
 - **Dynamic Fire Risk Calculation**: Compute time to flashover (ttf) based on weather conditions
 - **Weather Data Processing**: Parse and process CSV datasets with temperature, humidity, and wind data
@@ -35,7 +35,7 @@ provides the resulting fire risk as _time to flashover (ttf)_.
 - **Command-line Interface**: Run calculations standalone for quick testing
 - **Research-backed Model**: Based on peer-reviewed academic research
 
-## 🚀 Installation
+## Installation
 
 The project is based on using [uv](https://docs.astral.sh/uv/) as the package manager.
 If you want to build this project on you own, make sure that [uv is installed correctly](https://docs.astral.sh/uv/getting-started/installation/).
@@ -58,7 +58,7 @@ uv run python src/frcm/__main__.py ./bergen_2026_01_09.csv
 
 where `./bergen_2026_01_09.csv` is an example CSV demostrating the input format which comes bundled with this repo.
 
-## 📦 Overview
+## Overview
 
 The implementation is organised into the following main folders:
 
@@ -67,7 +67,7 @@ The implementation is organised into the following main folders:
 
 The central method of the application is the method `compute()` in `fireriskmodel.compute`.
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! Please check our [issue tracker](https://github.com/isak148/firegurad/issues) to see ongoing work and planned features.
 
@@ -78,11 +78,11 @@ Current development focus includes:
 - Security and authentication
 - Notification services
 
-## 📄 License
+## License
 
 This project is licensed under the terms found in the [COPYING.txt](COPYING.txt) file.
 
-## 👥 Maintainers
+## Maintainers
 
 - Lars Michael Kristensen
 - Patrick Stünkel
