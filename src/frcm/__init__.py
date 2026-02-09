@@ -1,6 +1,8 @@
 from frcm.datamodel.model import WeatherData, WeatherDataPoint, FireRisk, FireRiskPrediction
 from frcm.fireriskmodel.compute import compute
+from frcm.notification import NotificationService, NotificationConfig
 import sys
+import os
 from pathlib import Path
 
 
@@ -19,6 +21,26 @@ def console_main():
     print(f"Computing FireRisk for given data in '{file.absolute()}' ({len(wd.data)} datapoints)", end="\n\n")
 
     risks = compute(wd)
+
+    # Setup notification service if enabled
+    notification_config = NotificationConfig(
+        enabled=os.getenv('FRCM_NOTIFICATIONS_ENABLED', 'false').lower() == 'true',
+        broker_host=os.getenv('FRCM_MQTT_BROKER_HOST', 'localhost'),
+        broker_port=int(os.getenv('FRCM_MQTT_BROKER_PORT', '1883')),
+        topic=os.getenv('FRCM_MQTT_TOPIC', 'frcm/fire-danger'),
+        username=os.getenv('FRCM_MQTT_USERNAME'),
+        password=os.getenv('FRCM_MQTT_PASSWORD'),
+        client_id=os.getenv('FRCM_MQTT_CLIENT_ID', 'frcm-notifier')
+    )
+    
+    if notification_config.enabled:
+        try:
+            notifier = NotificationService(notification_config)
+            notifier.publish_fire_risk_change(risks)
+            notifier.disconnect()
+            print("Fire danger notification published successfully")
+        except Exception as e:
+            print(f"Warning: Failed to publish notification: {e}")
 
     if len(sys.argv) == 3:
         output = Path(sys.argv[2])
