@@ -1,5 +1,7 @@
 # DYNAMIC Fire risk indicator implementation
 
+[![CI](https://github.com/isak148/firegurad/workflows/CI/badge.svg)](https://github.com/isak148/firegurad/actions/workflows/ci.yml)
+
 This repository contains a _simplified version_ the implementation of the dynamic fire risk indicator
 described in the submitted paper:
 
