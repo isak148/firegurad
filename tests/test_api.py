@@ -61,11 +61,14 @@ class TestPublicEndpoints:
 class TestAuthenticationDisabled:
     """Test API behavior when authentication is disabled."""
     
+    @patch("frcm.api.auth.settings")
     @patch("frcm.api.config.settings")
-    def test_calculate_without_api_key_when_auth_disabled(self, mock_settings, client, sample_weather_data):
+    def test_calculate_without_api_key_when_auth_disabled(self, mock_config_settings, mock_auth_settings, client, sample_weather_data):
         """Test that calculation works without API key when auth is disabled."""
-        mock_settings.is_auth_enabled = False
-        mock_settings.API_KEYS = []
+        mock_config_settings.is_auth_enabled = False
+        mock_config_settings.API_KEYS = []
+        mock_auth_settings.is_auth_enabled = False
+        mock_auth_settings.API_KEYS = []
         
         response = client.post(
             "/calculate",
@@ -133,11 +136,14 @@ class TestAuthenticationEnabled:
 class TestCalculateEndpoint:
     """Test the calculate endpoint functionality."""
     
+    @patch("frcm.api.auth.settings")
     @patch("frcm.api.config.settings")
-    def test_calculate_with_empty_data(self, mock_settings, client):
+    def test_calculate_with_empty_data(self, mock_config_settings, mock_auth_settings, client):
         """Test that calculation fails with empty data."""
-        mock_settings.is_auth_enabled = False
-        mock_settings.API_KEYS = []
+        mock_config_settings.is_auth_enabled = False
+        mock_config_settings.API_KEYS = []
+        mock_auth_settings.is_auth_enabled = False
+        mock_auth_settings.API_KEYS = []
         
         response = client.post(
             "/calculate",
@@ -146,11 +152,14 @@ class TestCalculateEndpoint:
         # Should return either 400 (our validation) or 500 (compute error)
         assert response.status_code in [400, 500]
     
+    @patch("frcm.api.auth.settings")
     @patch("frcm.api.config.settings")
-    def test_calculate_with_invalid_data_format(self, mock_settings, client):
+    def test_calculate_with_invalid_data_format(self, mock_config_settings, mock_auth_settings, client):
         """Test that calculation fails with invalid data format."""
-        mock_settings.is_auth_enabled = False
-        mock_settings.API_KEYS = []
+        mock_config_settings.is_auth_enabled = False
+        mock_config_settings.API_KEYS = []
+        mock_auth_settings.is_auth_enabled = False
+        mock_auth_settings.API_KEYS = []
         
         response = client.post(
             "/calculate",
@@ -158,11 +167,14 @@ class TestCalculateEndpoint:
         )
         assert response.status_code == 422  # Validation error
     
+    @patch("frcm.api.auth.settings")
     @patch("frcm.api.config.settings")
-    def test_calculate_with_valid_data(self, mock_settings, client, sample_weather_data):
+    def test_calculate_with_valid_data(self, mock_config_settings, mock_auth_settings, client, sample_weather_data):
         """Test successful calculation with valid data."""
-        mock_settings.is_auth_enabled = False
-        mock_settings.API_KEYS = []
+        mock_config_settings.is_auth_enabled = False
+        mock_config_settings.API_KEYS = []
+        mock_auth_settings.is_auth_enabled = False
+        mock_auth_settings.API_KEYS = []
         
         response = client.post(
             "/calculate",
