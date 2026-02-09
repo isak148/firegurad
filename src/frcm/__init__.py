@@ -1,6 +1,9 @@
 from frcm.datamodel.model import WeatherData, WeatherDataPoint, FireRisk, FireRiskPrediction
 from frcm.fireriskmodel.compute import compute
 from frcm.notification import NotificationService, NotificationConfig
+from frcm.met_integration.client import METClient
+from frcm.met_integration.transform import transform_met_to_weather_data, fetch_and_transform_weather_data
+from frcm.fireriskmodel.compute_cached import compute_with_cache
 import sys
 import os
 from pathlib import Path
@@ -20,7 +23,8 @@ def console_main():
 
     print(f"Computing FireRisk for given data in '{file.absolute()}' ({len(wd.data)} datapoints)", end="\n\n")
 
-    risks = compute(wd)
+    # Use cached computation by default
+    risks = compute_with_cache(wd)
 
     # Setup notification service if enabled
     notification_config = NotificationConfig(
