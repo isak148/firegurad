@@ -133,7 +133,7 @@
                         <i class="fa-solid fa-clock mr-2"></i>Current
                     </button>
                     <button id="tab-historic" class="tab-button px-6 py-3 font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-700" onclick="switchTab('historic')">
-                        <i class="fa-solid fa-history mr-2"></i>Historic
+                        <i class="fa-solid fa-clock-rotate-left mr-2"></i>Historic
                     </button>
                     <button id="tab-future" class="tab-button px-6 py-3 font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-700" onclick="switchTab('future')">
                         <i class="fa-solid fa-calendar-days mr-2"></i>Future
@@ -431,6 +431,11 @@
         const MET_API_ENDPOINT = 'https://api.met.no/weatherapi/locationforecast/2.0/compact';
         const USER_AGENT = 'fireguard/0.1.0 github.com/isak148/firegurad';
         
+        // TTF (Time to Flashover) Risk Thresholds (in minutes)
+        const TTF_VERY_HIGH_RISK = 5;    // TTF < 5 minutes
+        const TTF_HIGH_RISK = 15;        // 5 <= TTF <= 15 minutes
+        // TTF > 15 minutes is considered Low to Moderate Risk
+        
         // Bergen, Norway coordinates (example location)
         const LOCATION = {
             name: 'Bergen, Norway',
@@ -566,9 +571,9 @@
 
         /**
          * Apply color coding to the TTF display based on the value
-         * Red: TTF < 5 (Very High Risk)
-         * Yellow: 5 <= TTF <= 15 (High Risk)
-         * Green: TTF > 15 (Low to Moderate Risk)
+         * Red: TTF < TTF_VERY_HIGH_RISK (Very High Risk)
+         * Yellow: TTF_VERY_HIGH_RISK <= TTF <= TTF_HIGH_RISK (High Risk)
+         * Green: TTF > TTF_HIGH_RISK (Low to Moderate Risk)
          * 
          * @param {number} ttf - Time to Flashover in minutes
          */
@@ -582,12 +587,12 @@
             ttfIcon.className = 'fa-solid fa-fire text-2xl';
             ttfLabel.className = 'text-xs font-semibold uppercase tracking-wider';
             
-            if (ttf < 5) {
+            if (ttf < TTF_VERY_HIGH_RISK) {
                 // Red - Very High Risk
                 ttfCard.classList.add('bg-gradient-to-br', 'from-red-100', 'to-red-200', 'border-red-300');
                 ttfIcon.classList.add('text-red-600');
                 ttfLabel.classList.add('text-red-700');
-            } else if (ttf <= 15) {
+            } else if (ttf <= TTF_HIGH_RISK) {
                 // Yellow - High Risk
                 ttfCard.classList.add('bg-gradient-to-br', 'from-yellow-100', 'to-yellow-200', 'border-yellow-300');
                 ttfIcon.classList.add('text-yellow-600');
@@ -920,6 +925,11 @@
                     if (instant.wind_speed !== undefined) windSpeeds.push(instant.wind_speed);
                 });
                 
+                // Check if arrays have data before calculating averages
+                if (temps.length === 0 || humidities.length === 0 || windSpeeds.length === 0) {
+                    return; // Skip this day if we don't have complete data
+                }
+                
                 const avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
                 const avgHumidity = humidities.reduce((a, b) => a + b, 0) / humidities.length;
                 const avgWindSpeed = windSpeeds.reduce((a, b) => a + b, 0) / windSpeeds.length;
@@ -951,13 +961,13 @@
                 day: 'numeric' 
             });
             
-            // Determine TTF color
+            // Determine TTF color based on risk thresholds
             let ttfColor = 'text-green-600';
             let ttfBg = 'bg-green-100';
-            if (dayData.ttf < 5) {
+            if (dayData.ttf < TTF_VERY_HIGH_RISK) {
                 ttfColor = 'text-red-600';
                 ttfBg = 'bg-red-100';
-            } else if (dayData.ttf <= 15) {
+            } else if (dayData.ttf <= TTF_HIGH_RISK) {
                 ttfColor = 'text-yellow-600';
                 ttfBg = 'bg-yellow-100';
             }
