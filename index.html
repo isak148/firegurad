@@ -78,7 +78,7 @@
                                 </div>
                                 <div>
                                     <div class="text-sm text-slate-400">Sensor Node A-12</div>
-                                    <div class="text-white font-medium">24°C / 75.2°F</div>
+                                    <div class="text-white font-medium" id="live-temp">--</div>
                                 </div>
                             </div>
                             <span class="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">Active</span>
@@ -90,7 +90,7 @@
                                 </div>
                                 <div>
                                     <div class="text-sm text-slate-400">Smoke Density</div>
-                                    <div class="text-white font-medium">0.02% ppm</div>
+                                    <div class="text-white font-medium" id="live-humidity">--</div>
                                 </div>
                             </div>
                             <span class="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">Active</span>
@@ -102,10 +102,10 @@
                                 </div>
                                 <div>
                                     <div class="text-sm text-slate-400">Alert Status</div>
-                                    <div class="text-white font-bold">Monitoring</div>
+                                    <div class="text-white font-bold" id="live-status">--</div>
                                 </div>
                             </div>
-                            <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">Secure</span>
+                            <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded" id="live-badge">--</span>
                         </div>
                     </div>
                 </div>
@@ -507,43 +507,43 @@
             const ttfCard = document.getElementById('ttf-card');
             const ttfIcon = document.getElementById('ttf-icon');
             const ttfLabel = document.getElementById('ttf-label');
+            const liveStatus = document.getElementById('live-status');
+            const liveBadge = document.getElementById('live-badge');
             
             // Remove all existing color classes
             ttfCard.className = 'p-6 rounded-xl border transition-colors duration-300';
             ttfIcon.className = 'fa-solid fa-fire text-2xl';
             ttfLabel.className = 'text-xs font-semibold uppercase tracking-wider';
+            liveStatus.className = 'font-bold';
+            liveBadge.className = 'text-xs px-2 py-1 rounded';
             
             if (ttf < 5) {
                 // Red - Very High Risk
                 ttfCard.classList.add('bg-gradient-to-br', 'from-red-100', 'to-red-200', 'border-red-300');
                 ttfIcon.classList.add('text-red-600');
                 ttfLabel.classList.add('text-red-700');
+                liveStatus.classList.add('text-red-300');
+                liveBadge.classList.add('bg-red-900', 'text-red-300');
             } else if (ttf <= 15) {
                 // Yellow - High Risk
                 ttfCard.classList.add('bg-gradient-to-br', 'from-yellow-100', 'to-yellow-200', 'border-yellow-300');
                 ttfIcon.classList.add('text-yellow-600');
                 ttfLabel.classList.add('text-yellow-700');
+                liveStatus.classList.add('text-yellow-300');
+                liveBadge.classList.add('bg-yellow-900', 'text-yellow-300');
             } else {
                 // Green - Low to Moderate Risk
                 ttfCard.classList.add('bg-gradient-to-br', 'from-green-100', 'to-green-200', 'border-green-300');
                 ttfIcon.classList.add('text-green-600');
                 ttfLabel.classList.add('text-green-700');
+                liveStatus.classList.add('text-green-300');
+                liveBadge.classList.add('bg-green-900', 'text-green-300');
             }
         }
 
         /**
          * Updates the UI with weather data
-         * @param {Object} weatherData - Parsed weather data
-         */
-        function updateWeatherDisplay(weatherData) {
-            // Update temperature
-            document.getElementById('temperature-value').textContent = 
-                `${weatherData.temperature.toFixed(1)}°C`;
-            
-            // Update humidity
-            document.getElementById('humidity-value').textContent = 
-                `${weatherData.humidity.toFixed(1)}%`;
-            
+         * @param {Object} weather
             // Update wind speed
             document.getElementById('wind-speed-value').textContent = 
                 `${weatherData.windSpeed.toFixed(1)} m/s`;
