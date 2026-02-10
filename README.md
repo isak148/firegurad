@@ -8,9 +8,10 @@ FireGuard aims to provide an accessible, API-driven platform for calculating dyn
 
 ## Quick Links
 
-- ** Documentation**: [Technical implementation details](#overview) (see below)
-- ** Source Code**: [GitHub Repository](https://github.com/isak148/firegurad)
-- ** Backlog**: [GitHub Issues & Project Board](https://github.com/isak148/firegurad/issues)
+- **Quick Setup Guide**: [Get started in 1 minute](QUICK_SETUP_GUIDE.md) 🚀
+- **Documentation**: [Technical implementation details](#overview) (see below)
+- **Source Code**: [GitHub Repository](https://github.com/isak148/firegurad)
+- **Backlog**: [GitHub Issues & Project Board](https://github.com/isak148/firegurad/issues)
 
 ---
 
