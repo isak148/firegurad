@@ -89,7 +89,7 @@
                                     <i class="fa-solid fa-smog"></i>
                                 </div>
                                 <div>
-                                    <div class="text-sm text-slate-400">Smoke Density</div>
+                                    <div class="text-sm text-slate-400">Humidity</div>
                                     <div class="text-white font-medium" id="live-humidity">--</div>
                                 </div>
                             </div>
@@ -514,8 +514,8 @@
             ttfCard.className = 'p-6 rounded-xl border transition-colors duration-300';
             ttfIcon.className = 'fa-solid fa-fire text-2xl';
             ttfLabel.className = 'text-xs font-semibold uppercase tracking-wider';
-            liveStatus.className = 'font-bold';
-            liveBadge.className = 'text-xs px-2 py-1 rounded';
+            liveStatus.className = 'text-white font-bold';
+            liveBadge.className = 'text-xs bg-green-900 text-green-300 px-2 py-1 rounded';
             
             if (ttf < 5) {
                 // Red - Very High Risk
@@ -543,11 +543,27 @@
 
         /**
          * Updates the UI with weather data
-         * @param {Object} weather
+         * @param {Object} weatherData - Parsed weather data
+         */
+        function updateWeatherDisplay(weatherData) {
+            // Update temperature
+            document.getElementById('temperature-value').textContent = 
+                `${weatherData.temperature.toFixed(1)}°C`;
+            
+            // Update humidity
+            document.getElementById('humidity-value').textContent = 
+                `${weatherData.humidity.toFixed(1)}%`;
+            
             // Update wind speed
             document.getElementById('wind-speed-value').textContent = 
                 `${weatherData.windSpeed.toFixed(1)} m/s`;
-            
+
+            // Live Dashboard updates
+            const tempText = `${weatherData.temperature.toFixed(1)}°C / ${(weatherData.temperature * 9/5 + 32).toFixed(1)}°F`;
+            const humidityText = `${weatherData.humidity.toFixed(1)}% RH`;
+            document.getElementById('live-temp').textContent = tempText;
+            document.getElementById('live-humidity').textContent = humidityText;
+
             // Calculate and update TTF
             const ttf = calculateSimplifiedTTF(
                 weatherData.temperature,
@@ -556,6 +572,12 @@
             );
             document.getElementById('ttf-value').textContent = `${ttf.toFixed(1)}`;
             
+            // Update alert status to reflect TTF risk
+            const riskLabel = ttf < 5 ? 'Very High Risk' : ttf <= 15 ? 'High Risk' : 'Low Risk';
+            const badgeLabel = ttf < 5 ? 'Critical' : ttf <= 15 ? 'Warning' : 'Safe';
+            document.getElementById('live-status').textContent = riskLabel;
+            document.getElementById('live-badge').textContent = badgeLabel;
+
             // Apply color coding based on TTF value
             applyTTFColorCoding(ttf);
             
