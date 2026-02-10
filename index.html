@@ -514,8 +514,27 @@
             }
         }
 
-        // Load weather data when the page loads
-        document.addEventListener('DOMContentLoaded', loadWeatherData);
+        /**
+         * Start auto-refresh timer for weather data
+         * Refreshes every 5 minutes (300000ms)
+         */
+        function startAutoRefresh() {
+            const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
+            
+            console.log('Starting auto-refresh for weather data (every 5 minutes)');
+            
+            // Set up interval to refresh weather data
+            setInterval(() => {
+                console.log('Auto-refreshing weather data...');
+                loadWeatherData();
+            }, REFRESH_INTERVAL);
+        }
+
+        // Load weather data when the page loads and start auto-refresh
+        document.addEventListener('DOMContentLoaded', () => {
+            loadWeatherData();
+            startAutoRefresh();
+        });
     </script>
 
 </body>
