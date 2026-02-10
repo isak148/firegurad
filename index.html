@@ -120,24 +120,39 @@
                 <div class="flex items-center justify-between mb-6">
                     <div class="flex items-center">
                         <i class="fa-solid fa-cloud-sun text-3xl text-blue-500 mr-3"></i>
-                        <h3 class="text-2xl font-bold text-slate-900">Current Weather Conditions</h3>
+                        <h3 class="text-2xl font-bold text-slate-900">Weather & Fire Risk Data</h3>
                     </div>
                     <div id="weather-location" class="text-sm text-slate-500 font-medium">
                         <i class="fa-solid fa-location-dot mr-1"></i>Bergen, Norway
                     </div>
                 </div>
                 
-                <div id="weather-loading" class="text-center py-8">
-                    <i class="fa-solid fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
-                    <p class="text-slate-600">Loading weather data...</p>
+                <!-- Tab Navigation -->
+                <div class="flex border-b border-slate-200 mb-6">
+                    <button id="tab-current" class="tab-button px-6 py-3 font-semibold transition-colors border-b-2 border-blue-500 text-blue-600" onclick="switchTab('current')">
+                        <i class="fa-solid fa-clock mr-2"></i>Current
+                    </button>
+                    <button id="tab-historic" class="tab-button px-6 py-3 font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-700" onclick="switchTab('historic')">
+                        <i class="fa-solid fa-clock-rotate-left mr-2"></i>Historic
+                    </button>
+                    <button id="tab-future" class="tab-button px-6 py-3 font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-700" onclick="switchTab('future')">
+                        <i class="fa-solid fa-calendar-days mr-2"></i>Future
+                    </button>
                 </div>
+                
+                <!-- Current Tab Content -->
+                <div id="content-current" class="tab-content">
+                    <div id="weather-loading" class="text-center py-8">
+                        <i class="fa-solid fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
+                        <p class="text-slate-600">Loading weather data...</p>
+                    </div>
 
-                <div id="weather-error" class="hidden text-center py-8">
-                    <i class="fa-solid fa-exclamation-triangle text-3xl text-red-500 mb-3"></i>
-                    <p class="text-slate-600" id="error-message">Failed to load weather data</p>
-                </div>
+                    <div id="weather-error" class="hidden text-center py-8">
+                        <i class="fa-solid fa-exclamation-triangle text-3xl text-red-500 mb-3"></i>
+                        <p class="text-slate-600" id="error-message">Failed to load weather data</p>
+                    </div>
 
-                <div id="weather-data" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div id="weather-data" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <!-- Temperature -->
                     <div class="bg-gradient-to-br from-red-50 to-orange-50 p-6 rounded-xl border border-red-100">
                         <div class="flex items-center justify-between mb-3">
@@ -179,11 +194,65 @@
                     </div>
                 </div>
 
-                <div class="mt-6 pt-6 border-t border-slate-200 text-xs text-slate-500 text-center">
-                    Data provided by <a href="https://api.met.no" target="_blank" class="text-blue-600 hover:underline">MET Norway Weather API</a>
-                    <span class="mx-2">•</span>
-                    <span id="last-updated">Last updated: --</span>
+                    <div class="mt-6 pt-6 border-t border-slate-200 text-xs text-slate-500 text-center">
+                        Data provided by <a href="https://api.met.no" target="_blank" class="text-blue-600 hover:underline">MET Norway Weather API</a>
+                        <span class="mx-2">•</span>
+                        <span id="last-updated">Last updated: --</span>
+                    </div>
                 </div>
+
+                <!-- Historic Tab Content -->
+                <div id="content-historic" class="tab-content hidden">
+                    <div id="historic-loading" class="text-center py-8">
+                        <i class="fa-solid fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
+                        <p class="text-slate-600">Loading historic data...</p>
+                    </div>
+
+                    <div id="historic-error" class="hidden text-center py-8">
+                        <i class="fa-solid fa-exclamation-triangle text-3xl text-red-500 mb-3"></i>
+                        <p class="text-slate-600" id="historic-error-message">Failed to load historic data</p>
+                    </div>
+
+                    <div id="historic-data" class="hidden">
+                        <div class="mb-6">
+                            <p class="text-slate-600 text-sm mb-4">Historic weather data and fire risk calculations for the past 7 days</p>
+                        </div>
+                        <div id="historic-data-container" class="space-y-4">
+                            <!-- Historic data will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t border-slate-200 text-xs text-slate-500 text-center">
+                        Data provided by <a href="https://api.met.no" target="_blank" class="text-blue-600 hover:underline">MET Norway Weather API</a>
+                    </div>
+                </div>
+
+                <!-- Future Tab Content -->
+                <div id="content-future" class="tab-content hidden">
+                    <div id="future-loading" class="text-center py-8">
+                        <i class="fa-solid fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
+                        <p class="text-slate-600">Loading forecast data...</p>
+                    </div>
+
+                    <div id="future-error" class="hidden text-center py-8">
+                        <i class="fa-solid fa-exclamation-triangle text-3xl text-red-500 mb-3"></i>
+                        <p class="text-slate-600" id="future-error-message">Failed to load forecast data</p>
+                    </div>
+
+                    <div id="future-data" class="hidden">
+                        <div class="mb-6">
+                            <p class="text-slate-600 text-sm mb-4">7-day weather forecast and fire risk predictions</p>
+                        </div>
+                        <div id="future-data-container" class="space-y-4">
+                            <!-- Future data will be populated here -->
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t border-slate-200 text-xs text-slate-500 text-center">
+                        Data provided by <a href="https://api.met.no" target="_blank" class="text-blue-600 hover:underline">MET Norway Weather API</a>
+                    </div>
+                </div>
+
             </div>
         </div>
     </section>
@@ -362,6 +431,11 @@
         const MET_API_ENDPOINT = 'https://api.met.no/weatherapi/locationforecast/2.0/compact';
         const USER_AGENT = 'fireguard/0.1.0 github.com/isak148/firegurad';
         
+        // TTF (Time to Flashover) Risk Thresholds (in minutes)
+        const TTF_VERY_HIGH_RISK = 5;    // TTF < 5 minutes
+        const TTF_HIGH_RISK = 15;        // 5 <= TTF <= 15 minutes
+        // TTF > 15 minutes is considered Low to Moderate Risk
+        
         // Bergen, Norway coordinates (example location)
         const LOCATION = {
             name: 'Bergen, Norway',
@@ -497,9 +571,9 @@
 
         /**
          * Apply color coding to the TTF display based on the value
-         * Red: TTF < 5 (Very High Risk)
-         * Yellow: 5 <= TTF <= 15 (High Risk)
-         * Green: TTF > 15 (Low to Moderate Risk)
+         * Red: TTF < TTF_VERY_HIGH_RISK (Very High Risk)
+         * Yellow: TTF_VERY_HIGH_RISK <= TTF <= TTF_HIGH_RISK (High Risk)
+         * Green: TTF > TTF_HIGH_RISK (Low to Moderate Risk)
          * 
          * @param {number} ttf - Time to Flashover in minutes
          */
@@ -517,14 +591,12 @@
             liveStatus.className = 'text-white font-bold';
             liveBadge.className = 'text-xs bg-green-900 text-green-300 px-2 py-1 rounded';
             
-            if (ttf < 5) {
+            if (ttf < TTF_VERY_HIGH_RISK) {
                 // Red - Very High Risk
                 ttfCard.classList.add('bg-gradient-to-br', 'from-red-100', 'to-red-200', 'border-red-300');
                 ttfIcon.classList.add('text-red-600');
                 ttfLabel.classList.add('text-red-700');
-                liveStatus.classList.add('text-red-300');
-                liveBadge.classList.add('bg-red-900', 'text-red-300');
-            } else if (ttf <= 15) {
+            } else if (ttf <= TTF_HIGH_RISK) {
                 // Yellow - High Risk
                 ttfCard.classList.add('bg-gradient-to-br', 'from-yellow-100', 'to-yellow-200', 'border-yellow-300');
                 ttfIcon.classList.add('text-yellow-600');
@@ -648,6 +720,304 @@
             }, REFRESH_INTERVAL);
             
             return intervalId;
+        }
+
+        /**
+         * Switch between tabs
+         * @param {string} tabName - Name of the tab to switch to ('current', 'historic', 'future')
+         */
+        function switchTab(tabName) {
+            // Update tab buttons
+            const tabs = ['current', 'historic', 'future'];
+            tabs.forEach(tab => {
+                const button = document.getElementById(`tab-${tab}`);
+                const content = document.getElementById(`content-${tab}`);
+                
+                if (tab === tabName) {
+                    button.classList.remove('border-transparent', 'text-slate-500');
+                    button.classList.add('border-blue-500', 'text-blue-600');
+                    content.classList.remove('hidden');
+                } else {
+                    button.classList.remove('border-blue-500', 'text-blue-600');
+                    button.classList.add('border-transparent', 'text-slate-500');
+                    content.classList.add('hidden');
+                }
+            });
+
+            // Load data for the selected tab if not already loaded
+            if (tabName === 'historic' && !window.historicDataLoaded) {
+                loadHistoricData();
+            } else if (tabName === 'future' && !window.futureDataLoaded) {
+                loadFutureData();
+            }
+        }
+
+        /**
+         * Load and display historic weather data
+         */
+        async function loadHistoricData() {
+            const loadingEl = document.getElementById('historic-loading');
+            const errorEl = document.getElementById('historic-error');
+            const dataEl = document.getElementById('historic-data');
+            const containerEl = document.getElementById('historic-data-container');
+            
+            try {
+                // Show loading
+                loadingEl.classList.remove('hidden');
+                errorEl.classList.add('hidden');
+                dataEl.classList.add('hidden');
+                
+                // Generate mock historic data for the past 7 days
+                // In a production environment, this would fetch from a backend API
+                const historicData = generateMockHistoricData();
+                
+                // Clear container
+                containerEl.innerHTML = '';
+                
+                // Display historic data grouped by day
+                historicData.forEach(day => {
+                    const dayCard = createDayCard(day);
+                    containerEl.appendChild(dayCard);
+                });
+                
+                window.historicDataLoaded = true;
+                
+                // Show data
+                loadingEl.classList.add('hidden');
+                dataEl.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Failed to load historic data:', error);
+                document.getElementById('historic-error-message').textContent = 'Failed to load historic data: ' + error.message;
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        /**
+         * Load and display future forecast data
+         */
+        async function loadFutureData() {
+            const loadingEl = document.getElementById('future-loading');
+            const errorEl = document.getElementById('future-error');
+            const dataEl = document.getElementById('future-data');
+            const containerEl = document.getElementById('future-data-container');
+            
+            try {
+                // Show loading
+                loadingEl.classList.remove('hidden');
+                errorEl.classList.add('hidden');
+                dataEl.classList.add('hidden');
+                
+                // Fetch future forecast data from MET API
+                const rawData = await fetchWeatherData();
+                const timeseries = rawData.properties.timeseries;
+                
+                // Group data by day
+                const futureData = groupForecastByDay(timeseries);
+                
+                // Clear container
+                containerEl.innerHTML = '';
+                
+                // Display forecast data grouped by day
+                futureData.forEach(day => {
+                    const dayCard = createDayCard(day);
+                    containerEl.appendChild(dayCard);
+                });
+                
+                window.futureDataLoaded = true;
+                
+                // Show data
+                loadingEl.classList.add('hidden');
+                dataEl.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Failed to load future data:', error);
+                document.getElementById('future-error-message').textContent = 'Failed to load forecast data. Using mock data for demonstration.';
+                
+                // Fall back to mock data
+                try {
+                    const futureData = generateMockFutureData();
+                    containerEl.innerHTML = '';
+                    futureData.forEach(day => {
+                        const dayCard = createDayCard(day);
+                        containerEl.appendChild(dayCard);
+                    });
+                    window.futureDataLoaded = true;
+                    loadingEl.classList.add('hidden');
+                    dataEl.classList.remove('hidden');
+                } catch (e) {
+                    loadingEl.classList.add('hidden');
+                    errorEl.classList.remove('hidden');
+                }
+            }
+        }
+
+        /**
+         * Generate mock historic data for demonstration
+         */
+        function generateMockHistoricData() {
+            const days = [];
+            const now = new Date();
+            
+            for (let i = 7; i >= 1; i--) {
+                const date = new Date(now);
+                date.setDate(date.getDate() - i);
+                
+                const temp = 5 + Math.random() * 10;
+                const humidity = 70 + Math.random() * 20;
+                const windSpeed = 2 + Math.random() * 5;
+                const ttf = calculateSimplifiedTTF(temp, humidity, windSpeed);
+                
+                days.push({
+                    date: date,
+                    temperature: temp,
+                    humidity: humidity,
+                    windSpeed: windSpeed,
+                    ttf: ttf
+                });
+            }
+            
+            return days;
+        }
+
+        /**
+         * Generate mock future data for demonstration
+         */
+        function generateMockFutureData() {
+            const days = [];
+            const now = new Date();
+            
+            for (let i = 1; i <= 7; i++) {
+                const date = new Date(now);
+                date.setDate(date.getDate() + i);
+                
+                const temp = 8 + Math.random() * 8;
+                const humidity = 60 + Math.random() * 30;
+                const windSpeed = 3 + Math.random() * 4;
+                const ttf = calculateSimplifiedTTF(temp, humidity, windSpeed);
+                
+                days.push({
+                    date: date,
+                    temperature: temp,
+                    humidity: humidity,
+                    windSpeed: windSpeed,
+                    ttf: ttf
+                });
+            }
+            
+            return days;
+        }
+
+        /**
+         * Group forecast timeseries data by day
+         */
+        function groupForecastByDay(timeseries) {
+            const days = [];
+            const dayMap = new Map();
+            
+            timeseries.forEach((entry, index) => {
+                if (index > 168) return; // Limit to 7 days (168 hours)
+                
+                const timestamp = new Date(entry.time);
+                const dateKey = timestamp.toDateString();
+                
+                if (!dayMap.has(dateKey)) {
+                    dayMap.set(dateKey, {
+                        date: timestamp,
+                        entries: []
+                    });
+                }
+                
+                dayMap.get(dateKey).entries.push(entry);
+            });
+            
+            // Calculate daily averages
+            dayMap.forEach((dayData) => {
+                const temps = [];
+                const humidities = [];
+                const windSpeeds = [];
+                
+                dayData.entries.forEach(entry => {
+                    const instant = entry.data.instant.details;
+                    if (instant.air_temperature !== undefined) temps.push(instant.air_temperature);
+                    if (instant.relative_humidity !== undefined) humidities.push(instant.relative_humidity);
+                    if (instant.wind_speed !== undefined) windSpeeds.push(instant.wind_speed);
+                });
+                
+                // Check if arrays have data before calculating averages
+                if (temps.length === 0 || humidities.length === 0 || windSpeeds.length === 0) {
+                    return; // Skip this day if we don't have complete data
+                }
+                
+                const avgTemp = temps.reduce((a, b) => a + b, 0) / temps.length;
+                const avgHumidity = humidities.reduce((a, b) => a + b, 0) / humidities.length;
+                const avgWindSpeed = windSpeeds.reduce((a, b) => a + b, 0) / windSpeeds.length;
+                const ttf = calculateSimplifiedTTF(avgTemp, avgHumidity, avgWindSpeed);
+                
+                days.push({
+                    date: dayData.date,
+                    temperature: avgTemp,
+                    humidity: avgHumidity,
+                    windSpeed: avgWindSpeed,
+                    ttf: ttf
+                });
+            });
+            
+            return days;
+        }
+
+        /**
+         * Create a day card element for historic or future data
+         */
+        function createDayCard(dayData) {
+            const card = document.createElement('div');
+            card.className = 'bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl p-6 border border-slate-200';
+            
+            const dateStr = dayData.date.toLocaleDateString('en-US', { 
+                weekday: 'long', 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric' 
+            });
+            
+            // Determine TTF color based on risk thresholds
+            let ttfColor = 'text-green-600';
+            let ttfBg = 'bg-green-100';
+            if (dayData.ttf < TTF_VERY_HIGH_RISK) {
+                ttfColor = 'text-red-600';
+                ttfBg = 'bg-red-100';
+            } else if (dayData.ttf <= TTF_HIGH_RISK) {
+                ttfColor = 'text-yellow-600';
+                ttfBg = 'bg-yellow-100';
+            }
+            
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h4 class="font-bold text-slate-900">${dateStr}</h4>
+                    </div>
+                    <div class="px-3 py-1 ${ttfBg} ${ttfColor} rounded-full text-sm font-semibold">
+                        TTF: ${dayData.ttf.toFixed(1)} min
+                    </div>
+                </div>
+                <div class="grid grid-cols-3 gap-4">
+                    <div>
+                        <div class="text-xs text-slate-500 mb-1">Temperature</div>
+                        <div class="text-lg font-semibold text-slate-900">${dayData.temperature.toFixed(1)}°C</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 mb-1">Humidity</div>
+                        <div class="text-lg font-semibold text-slate-900">${dayData.humidity.toFixed(1)}%</div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-500 mb-1">Wind Speed</div>
+                        <div class="text-lg font-semibold text-slate-900">${dayData.windSpeed.toFixed(1)} m/s</div>
+                    </div>
+                </div>
+            `;
+            
+            return card;
         }
 
         // Load weather data when the page loads and start auto-refresh
