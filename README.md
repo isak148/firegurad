@@ -8,9 +8,10 @@ FireGuard aims to provide an accessible, API-driven platform for calculating dyn
 
 ## Quick Links
 
-- ** Documentation**: [Technical implementation details](#overview) (see below)
-- ** Source Code**: [GitHub Repository](https://github.com/isak148/firegurad)
-- ** Backlog**: [GitHub Issues & Project Board](https://github.com/isak148/firegurad/issues)
+- **Quick Setup Guide**: [Get started in 1 minute](QUICK_SETUP_GUIDE.md) 🚀
+- **Documentation**: [Technical implementation details](#overview) (see below)
+- **Source Code**: [GitHub Repository](https://github.com/isak148/firegurad)
+- **Backlog**: [GitHub Issues & Project Board](https://github.com/isak148/firegurad/issues)
 
 ---
 
@@ -34,6 +35,27 @@ provides the resulting fire risk as _time to flashover (ttf)_.
 ## New: MET API Integration
 
 This repository now includes integration with the Meteorologisk institutt (MET) API, enabling automatic weather data fetching instead of relying solely on CSV files. See [MET Integration Documentation](src/frcm/met_integration/README.md) for details.
+
+## Scheduled Weather Data Harvesting
+
+**NEW:** FireGuard now supports automatic, scheduled weather data fetching from the MET API!
+
+### Quick Start: Fetch Weather Data Every Minute
+
+```bash
+# 1. Create a locations.json file (or use the provided example)
+cp locations_example.json my_locations.json
+
+# 2. Run the scheduled harvester (updates every 60 seconds by default)
+python -m frcm.worker.scheduled_harvester my_locations.json
+
+# Or with custom interval (e.g., every 5 minutes)
+python -m frcm.worker.scheduled_harvester my_locations.json --interval 300
+```
+
+This will automatically fetch **temperature, humidity, and wind speed** from the MET Frost API at your specified interval and compute fire risk predictions.
+
+For detailed documentation, see [Scheduled Harvester Guide](src/frcm/worker/SCHEDULED_HARVESTER.md).
 ## Features
 
 - **Command-line interface**: Process CSV files with weather data
