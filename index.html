@@ -137,7 +137,7 @@
                     <p class="text-slate-600" id="error-message">Failed to load weather data</p>
                 </div>
 
-                <div id="weather-data" class="hidden grid md:grid-cols-3 gap-6">
+                <div id="weather-data" class="hidden grid md:grid-cols-4 gap-6">
                     <!-- Temperature -->
                     <div class="bg-gradient-to-br from-red-50 to-orange-50 p-6 rounded-xl border border-red-100">
                         <div class="flex items-center justify-between mb-3">
@@ -166,6 +166,16 @@
                         </div>
                         <div class="text-3xl font-bold text-slate-900" id="wind-speed-value">--</div>
                         <div class="text-sm text-slate-600 mt-1">Wind Speed</div>
+                    </div>
+
+                    <!-- TTF (Time to Flashover) -->
+                    <div id="ttf-card" class="p-6 rounded-xl border transition-colors duration-300">
+                        <div class="flex items-center justify-between mb-3">
+                            <i class="fa-solid fa-fire text-2xl" id="ttf-icon"></i>
+                            <span class="text-xs font-semibold uppercase tracking-wider" id="ttf-label">Fire Risk (TTF)</span>
+                        </div>
+                        <div class="text-3xl font-bold text-slate-900" id="ttf-value">--</div>
+                        <div class="text-sm text-slate-600 mt-1">Time to Flashover (min)</div>
                     </div>
                 </div>
 
@@ -448,6 +458,80 @@
         }
 
         /**
+         * Calculate a simplified Time to Flashover (TTF) estimate
+         * This is a simplified version for demonstration purposes.
+         * In production, this should call the backend API for accurate calculations.
+         * 
+         * @param {number} temperature - Temperature in Celsius
+         * @param {number} humidity - Relative humidity in percentage (0-100)
+         * @param {number} windSpeed - Wind speed in m/s
+         * @returns {number} Estimated TTF in minutes
+         */
+        function calculateSimplifiedTTF(temperature, humidity, windSpeed) {
+            // Simplified formula based on the fire risk model concept:
+            // Lower humidity and higher temperature = higher fire risk (lower TTF)
+            // This is a rough approximation for demonstration
+            
+            // Base TTF starts at 30 minutes
+            let ttf = 30;
+            
+            // Humidity effect: Lower humidity increases risk (decreases TTF)
+            // Optimal humidity is around 60%, each 10% decrease reduces TTF
+            const humidityFactor = (humidity - 50) / 10;
+            ttf += humidityFactor * 3;
+            
+            // Temperature effect: Higher temperature increases risk (decreases TTF)
+            // Each 5°C above 15°C reduces TTF
+            const temperatureFactor = (temperature - 15) / 5;
+            ttf -= temperatureFactor * 2;
+            
+            // Wind effect: Higher wind speeds can increase fire risk slightly
+            const windFactor = windSpeed / 5;
+            ttf -= windFactor * 1;
+            
+            // Ensure TTF is positive and reasonable
+            ttf = Math.max(1, Math.min(120, ttf));
+            
+            return ttf;
+        }
+
+        /**
+         * Apply color coding to the TTF display based on the value
+         * Red: TTF < 5 (Very High Risk)
+         * Yellow: 5 <= TTF <= 15 (High Risk)
+         * Green: TTF > 15 (Low to Moderate Risk)
+         * 
+         * @param {number} ttf - Time to Flashover in minutes
+         */
+        function applyTTFColorCoding(ttf) {
+            const ttfCard = document.getElementById('ttf-card');
+            const ttfIcon = document.getElementById('ttf-icon');
+            const ttfLabel = document.getElementById('ttf-label');
+            
+            // Remove all existing color classes
+            ttfCard.className = 'p-6 rounded-xl border transition-colors duration-300';
+            ttfIcon.className = 'fa-solid fa-fire text-2xl';
+            ttfLabel.className = 'text-xs font-semibold uppercase tracking-wider';
+            
+            if (ttf < 5) {
+                // Red - Very High Risk
+                ttfCard.classList.add('bg-gradient-to-br', 'from-red-100', 'to-red-200', 'border-red-300');
+                ttfIcon.classList.add('text-red-600');
+                ttfLabel.classList.add('text-red-700');
+            } else if (ttf <= 15) {
+                // Yellow - High Risk
+                ttfCard.classList.add('bg-gradient-to-br', 'from-yellow-100', 'to-yellow-200', 'border-yellow-300');
+                ttfIcon.classList.add('text-yellow-600');
+                ttfLabel.classList.add('text-yellow-700');
+            } else {
+                // Green - Low to Moderate Risk
+                ttfCard.classList.add('bg-gradient-to-br', 'from-green-100', 'to-green-200', 'border-green-300');
+                ttfIcon.classList.add('text-green-600');
+                ttfLabel.classList.add('text-green-700');
+            }
+        }
+
+        /**
          * Updates the UI with weather data
          * @param {Object} weatherData - Parsed weather data
          */
@@ -463,6 +547,17 @@
             // Update wind speed
             document.getElementById('wind-speed-value').textContent = 
                 `${weatherData.windSpeed.toFixed(1)} m/s`;
+            
+            // Calculate and update TTF
+            const ttf = calculateSimplifiedTTF(
+                weatherData.temperature,
+                weatherData.humidity,
+                weatherData.windSpeed
+            );
+            document.getElementById('ttf-value').textContent = `${ttf.toFixed(1)}`;
+            
+            // Apply color coding based on TTF value
+            applyTTFColorCoding(ttf);
             
             // Update last updated timestamp
             const timestamp = new Date(weatherData.timestamp);
