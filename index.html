@@ -78,7 +78,7 @@
                                 </div>
                                 <div>
                                     <div class="text-sm text-slate-400">Sensor Node A-12</div>
-                                    <div class="text-white font-medium">24°C / 75.2°F</div>
+                                    <div class="text-white font-medium" id="live-temp">--</div>
                                 </div>
                             </div>
                             <span class="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">Active</span>
@@ -89,8 +89,8 @@
                                     <i class="fa-solid fa-smog"></i>
                                 </div>
                                 <div>
-                                    <div class="text-sm text-slate-400">Smoke Density</div>
-                                    <div class="text-white font-medium">0.02% ppm</div>
+                                    <div class="text-sm text-slate-400">Humidity</div>
+                                    <div class="text-white font-medium" id="live-humidity">--</div>
                                 </div>
                             </div>
                             <span class="text-xs bg-slate-700 text-slate-300 px-2 py-1 rounded">Active</span>
@@ -102,10 +102,10 @@
                                 </div>
                                 <div>
                                     <div class="text-sm text-slate-400">Alert Status</div>
-                                    <div class="text-white font-bold">Monitoring</div>
+                                    <div class="text-white font-bold" id="live-status">--</div>
                                 </div>
                             </div>
-                            <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded">Secure</span>
+                            <span class="text-xs bg-green-900 text-green-300 px-2 py-1 rounded" id="live-badge">--</span>
                         </div>
                     </div>
                 </div>
@@ -581,11 +581,15 @@
             const ttfCard = document.getElementById('ttf-card');
             const ttfIcon = document.getElementById('ttf-icon');
             const ttfLabel = document.getElementById('ttf-label');
+            const liveStatus = document.getElementById('live-status');
+            const liveBadge = document.getElementById('live-badge');
             
             // Remove all existing color classes
             ttfCard.className = 'p-6 rounded-xl border transition-colors duration-300';
             ttfIcon.className = 'fa-solid fa-fire text-2xl';
             ttfLabel.className = 'text-xs font-semibold uppercase tracking-wider';
+            liveStatus.className = 'text-white font-bold';
+            liveBadge.className = 'text-xs bg-green-900 text-green-300 px-2 py-1 rounded';
             
             if (ttf < TTF_VERY_HIGH_RISK) {
                 // Red - Very High Risk
@@ -597,11 +601,15 @@
                 ttfCard.classList.add('bg-gradient-to-br', 'from-yellow-100', 'to-yellow-200', 'border-yellow-300');
                 ttfIcon.classList.add('text-yellow-600');
                 ttfLabel.classList.add('text-yellow-700');
+                liveStatus.classList.add('text-yellow-300');
+                liveBadge.classList.add('bg-yellow-900', 'text-yellow-300');
             } else {
                 // Green - Low to Moderate Risk
                 ttfCard.classList.add('bg-gradient-to-br', 'from-green-100', 'to-green-200', 'border-green-300');
                 ttfIcon.classList.add('text-green-600');
                 ttfLabel.classList.add('text-green-700');
+                liveStatus.classList.add('text-green-300');
+                liveBadge.classList.add('bg-green-900', 'text-green-300');
             }
         }
 
@@ -621,7 +629,13 @@
             // Update wind speed
             document.getElementById('wind-speed-value').textContent = 
                 `${weatherData.windSpeed.toFixed(1)} m/s`;
-            
+
+            // Live Dashboard updates
+            const tempText = `${weatherData.temperature.toFixed(1)}°C / ${(weatherData.temperature * 9/5 + 32).toFixed(1)}°F`;
+            const humidityText = `${weatherData.humidity.toFixed(1)}% RH`;
+            document.getElementById('live-temp').textContent = tempText;
+            document.getElementById('live-humidity').textContent = humidityText;
+
             // Calculate and update TTF
             const ttf = calculateSimplifiedTTF(
                 weatherData.temperature,
@@ -630,6 +644,12 @@
             );
             document.getElementById('ttf-value').textContent = `${ttf.toFixed(1)}`;
             
+            // Update alert status to reflect TTF risk
+            const riskLabel = ttf < 5 ? 'Very High Risk' : ttf <= 15 ? 'High Risk' : 'Low Risk';
+            const badgeLabel = ttf < 5 ? 'Critical' : ttf <= 15 ? 'Warning' : 'Safe';
+            document.getElementById('live-status').textContent = riskLabel;
+            document.getElementById('live-badge').textContent = badgeLabel;
+
             // Apply color coding based on TTF value
             applyTTFColorCoding(ttf);
             
