@@ -137,7 +137,7 @@
                     <p class="text-slate-600" id="error-message">Failed to load weather data</p>
                 </div>
 
-                <div id="weather-data" class="hidden grid md:grid-cols-4 gap-6">
+                <div id="weather-data" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <!-- Temperature -->
                     <div class="bg-gradient-to-br from-red-50 to-orange-50 p-6 rounded-xl border border-red-100">
                         <div class="flex items-center justify-between mb-3">
@@ -476,7 +476,7 @@
             let ttf = 30;
             
             // Humidity effect: Lower humidity increases risk (decreases TTF)
-            // Optimal humidity is around 60%, each 10% decrease reduces TTF
+            // Using 50% as baseline humidity, each 10% deviation affects TTF
             const humidityFactor = (humidity - 50) / 10;
             ttf += humidityFactor * 3;
             
@@ -612,17 +612,20 @@
         /**
          * Start auto-refresh timer for weather data
          * Refreshes every 5 minutes (300000ms)
+         * @returns {number} The interval ID for potential cleanup
          */
         function startAutoRefresh() {
             const REFRESH_INTERVAL = 5 * 60 * 1000; // 5 minutes in milliseconds
             
             console.log('Starting auto-refresh for weather data (every 5 minutes)');
             
-            // Set up interval to refresh weather data
-            setInterval(() => {
+            // Set up interval to refresh weather data and store the interval ID
+            const intervalId = setInterval(() => {
                 console.log('Auto-refreshing weather data...');
                 loadWeatherData();
             }, REFRESH_INTERVAL);
+            
+            return intervalId;
         }
 
         // Load weather data when the page loads and start auto-refresh
