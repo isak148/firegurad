@@ -342,11 +342,15 @@
          * MET API Terms of Use: https://api.met.no/doc/TermsOfService
          * - Must include a User-Agent header identifying your application
          * - Respect rate limits and cache responses appropriately
+         * 
+         * Note: The User-Agent header is a forbidden header in browsers and cannot be set
+         * from client-side JavaScript. It will work properly when requests are made from
+         * a backend proxy server.
          */
 
         // Configuration
         const MET_API_ENDPOINT = 'https://api.met.no/weatherapi/locationforecast/2.0/compact';
-        const USER_AGENT = 'firegurad/0.1.0 github.com/isak148/firegurad';
+        const USER_AGENT = 'fireguard/0.1.0 github.com/isak148/firegurad';
         
         // Bergen, Norway coordinates (example location)
         const LOCATION = {
@@ -357,12 +361,16 @@
 
         /**
          * Fetches weather data from MET API
+         * Note: User-Agent header cannot be set from browser JavaScript (forbidden header).
+         * This will work correctly when the request is made from a backend server.
          * @returns {Promise<Object>} Weather data object
          */
         async function fetchWeatherData() {
             const url = `${MET_API_ENDPOINT}?lat=${LOCATION.latitude}&lon=${LOCATION.longitude}`;
             
             try {
+                // Note: User-Agent header is included but will be ignored by browser
+                // It's documented here for backend implementation reference
                 const response = await fetch(url, {
                     method: 'GET',
                     headers: {
