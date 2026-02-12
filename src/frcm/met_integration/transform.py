@@ -175,7 +175,8 @@ def transform_frost_to_weather_data(frost_response: Dict[str, Any]) -> WeatherDa
                         values[element_id] = float(value)
                 
                 # Check if we have all required values
-                if 'air_temperature' not in values or 'relative_humidity' not in values or 'wind_speed' not in values:
+                required_elements = {'air_temperature', 'relative_humidity', 'wind_speed'}
+                if not required_elements.issubset(values.keys()):
                     logger.warning(f"Skipping observation at {time_str}: missing required elements")
                     continue
                 
