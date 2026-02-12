@@ -19,6 +19,13 @@ class Settings:
     # Security settings
     REQUIRE_HTTPS: bool = config("FRCM_REQUIRE_HTTPS", default=True, cast=bool)
     
+    # CORS settings - comma-separated list of allowed origins
+    CORS_ORIGINS: List[str] = config(
+        "FRCM_CORS_ORIGINS", 
+        default="http://localhost:3000,http://localhost:8000,http://127.0.0.1:3000,http://127.0.0.1:8000",
+        cast=lambda v: [s.strip() for s in v.split(",") if s.strip()]
+    )
+    
     @property
     def is_auth_enabled(self) -> bool:
         """Check if authentication is enabled (has API keys configured)."""

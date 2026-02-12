@@ -429,6 +429,7 @@
 
         // Configuration
         const MET_API_ENDPOINT = 'https://api.met.no/weatherapi/locationforecast/2.0/compact';
+        const BACKEND_API_ENDPOINT = window.location.protocol + '//' + window.location.hostname + ':8000';
         const USER_AGENT = 'fireguard/0.1.0 github.com/isak148/firegurad';
         
         // TTF (Time to Flashover) Risk Thresholds (in minutes)
@@ -767,9 +768,20 @@
                 errorEl.classList.add('hidden');
                 dataEl.classList.add('hidden');
                 
-                // Generate mock historic data for the past 7 days
-                // In a production environment, this would fetch from a backend API
-                const historicData = generateMockHistoricData();
+                // Fetch real historic data from backend API
+                console.log('Fetching historical data from backend API...');
+                const url = `${BACKEND_API_ENDPOINT}/historical?latitude=${LOCATION.latitude}&longitude=${LOCATION.longitude}&days=7`;
+                
+                const response = await fetch(url);
+                if (!response.ok) {
+                    throw new Error(`API returned status ${response.status}: ${response.statusText}`);
+                }
+                
+                const apiData = await response.json();
+                console.log('Received historical data:', apiData);
+                
+                // Transform API data to display format
+                const historicData = transformHistoricalApiData(apiData);
                 
                 // Clear container
                 containerEl.innerHTML = '';
@@ -788,10 +800,76 @@
                 
             } catch (error) {
                 console.error('Failed to load historic data:', error);
-                document.getElementById('historic-error-message').textContent = 'Failed to load historic data: ' + error.message;
+                
+                // Show user-friendly error message
+                let errorMessage = 'Failed to load historic data. ';
+                if (error.message.includes('503')) {
+                    errorMessage += 'Historical data service is not configured on the backend. Please set FRCM_FROST_CLIENT_ID environment variable.';
+                } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                    errorMessage += 'Could not connect to backend API. Make sure the API server is running on port 8000.';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                document.getElementById('historic-error-message').textContent = errorMessage;
                 loadingEl.classList.add('hidden');
                 errorEl.classList.remove('hidden');
             }
+        }
+
+        /**
+         * Transform historical API data to display format
+         * Groups data by day and calculates daily averages
+         */
+        function transformHistoricalApiData(apiData) {
+            const dayMap = new Map();
+            
+            // Process weather data and fire risk together
+            for (let i = 0; i < apiData.weather_data.length; i++) {
+                const weatherPoint = apiData.weather_data[i];
+                const riskPoint = apiData.fire_risk[i];
+                
+                const date = new Date(weatherPoint.timestamp);
+                const dayKey = date.toISOString().split('T')[0];
+                
+                if (!dayMap.has(dayKey)) {
+                    dayMap.set(dayKey, {
+                        date: new Date(dayKey),
+                        temperatures: [],
+                        humidities: [],
+                        windSpeeds: [],
+                        ttfs: []
+                    });
+                }
+                
+                const dayData = dayMap.get(dayKey);
+                dayData.temperatures.push(weatherPoint.temperature);
+                dayData.humidities.push(weatherPoint.humidity);
+                dayData.windSpeeds.push(weatherPoint.wind_speed);
+                dayData.ttfs.push(riskPoint.ttf);
+            }
+            
+            // Calculate averages for each day
+            const result = [];
+            for (const [dayKey, dayData] of dayMap) {
+                const avgTemp = dayData.temperatures.reduce((a, b) => a + b, 0) / dayData.temperatures.length;
+                const avgHumidity = dayData.humidities.reduce((a, b) => a + b, 0) / dayData.humidities.length;
+                const avgWindSpeed = dayData.windSpeeds.reduce((a, b) => a + b, 0) / dayData.windSpeeds.length;
+                const avgTTF = dayData.ttfs.reduce((a, b) => a + b, 0) / dayData.ttfs.length;
+                
+                result.push({
+                    date: dayData.date,
+                    temperature: avgTemp,
+                    humidity: avgHumidity,
+                    windSpeed: avgWindSpeed,
+                    ttf: avgTTF
+                });
+            }
+            
+            // Sort by date (oldest first)
+            result.sort((a, b) => a.date - b.date);
+            
+            return result;
         }
 
         /**
