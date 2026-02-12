@@ -108,7 +108,7 @@ class FrostClient:
             raise
         except requests.exceptions.HTTPError as e:
             logger.error(f"HTTP error from Frost API: {e}")
-            if e.response.status_code == 401:
+            if hasattr(e, 'response') and e.response is not None and e.response.status_code == 401:
                 raise ValueError("Invalid Frost API client ID. Get one at https://frost.met.no/auth/requestCredentials.html")
             raise
         except requests.exceptions.RequestException as e:

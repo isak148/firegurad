@@ -4,7 +4,7 @@ Tests for the MET API data transformation module.
 
 import pytest
 import datetime
-from frcm.met_integration.transform import transform_met_to_weather_data, fetch_and_transform_weather_data
+from frcm.met_integration.transform import transform_met_to_weather_data, transform_frost_to_weather_data, fetch_and_transform_weather_data
 from frcm.datamodel.model import WeatherData, WeatherDataPoint
 
 
@@ -238,3 +238,154 @@ class TestFetchAndTransformWeatherData:
         assert isinstance(result, WeatherData)
         assert len(result.data) == 1
         mock_client.fetch_weather_data.assert_called_once_with(60.39, 5.32, 50)
+
+
+class TestTransformFrostToWeatherData:
+    """Test cases for the transform_frost_to_weather_data function."""
+    
+    def test_transform_valid_frost_response(self):
+        """Test transformation of a valid Frost API response."""
+        frost_response = {
+            'data': [
+                {
+                    'referenceTime': '2026-02-05T00:00:00.000Z',
+                    'observations': [
+                        {'elementId': 'air_temperature', 'value': 5.2},
+                        {'elementId': 'relative_humidity', 'value': 85.0},
+                        {'elementId': 'wind_speed', 'value': 3.5}
+                    ]
+                },
+                {
+                    'referenceTime': '2026-02-05T01:00:00.000Z',
+                    'observations': [
+                        {'elementId': 'air_temperature', 'value': 4.8},
+                        {'elementId': 'relative_humidity', 'value': 87.0},
+                        {'elementId': 'wind_speed', 'value': 3.2}
+                    ]
+                }
+            ]
+        }
+        
+        result = transform_frost_to_weather_data(frost_response)
+        
+        assert isinstance(result, WeatherData)
+        assert len(result.data) == 2
+        
+        # Check first data point
+        first_point = result.data[0]
+        assert isinstance(first_point, WeatherDataPoint)
+        assert first_point.temperature == 5.2
+        assert first_point.humidity == 85.0
+        assert first_point.wind_speed == 3.5
+        assert first_point.timestamp == datetime.datetime(2026, 2, 5, 0, 0, 0, tzinfo=datetime.timezone.utc)
+        
+        # Check second data point
+        second_point = result.data[1]
+        assert second_point.temperature == 4.8
+        assert second_point.humidity == 87.0
+        assert second_point.wind_speed == 3.2
+        assert second_point.timestamp == datetime.datetime(2026, 2, 5, 1, 0, 0, tzinfo=datetime.timezone.utc)
+    
+    def test_transform_frost_missing_data_field(self):
+        """Test that missing 'data' field raises ValueError."""
+        frost_response = {'some_field': 'some_value'}
+        
+        with pytest.raises(ValueError, match="missing 'data' field"):
+            transform_frost_to_weather_data(frost_response)
+    
+    def test_transform_frost_empty_data(self):
+        """Test that empty data array raises ValueError."""
+        frost_response = {'data': []}
+        
+        with pytest.raises(ValueError, match="contains no data"):
+            transform_frost_to_weather_data(frost_response)
+    
+    def test_transform_frost_missing_required_element(self):
+        """Test that observations missing required elements are skipped."""
+        frost_response = {
+            'data': [
+                {
+                    'referenceTime': '2026-02-05T00:00:00.000Z',
+                    'observations': [
+                        {'elementId': 'air_temperature', 'value': 5.2},
+                        # Missing humidity and wind_speed
+                    ]
+                },
+                {
+                    'referenceTime': '2026-02-05T01:00:00.000Z',
+                    'observations': [
+                        {'elementId': 'air_temperature', 'value': 4.8},
+                        {'elementId': 'relative_humidity', 'value': 87.0},
+                        {'elementId': 'wind_speed', 'value': 3.2}
+                    ]
+                }
+            ]
+        }
+        
+        result = transform_frost_to_weather_data(frost_response)
+        
+        # Only the second observation should be included
+        assert len(result.data) == 1
+        assert result.data[0].temperature == 4.8
+    
+    def test_transform_frost_handles_timezone_conversion(self):
+        """Test that timestamps with .000Z suffix are correctly converted."""
+        frost_response = {
+            'data': [
+                {
+                    'referenceTime': '2026-02-05T12:30:00.000Z',
+                    'observations': [
+                        {'elementId': 'air_temperature', 'value': 5.0},
+                        {'elementId': 'relative_humidity', 'value': 70.0},
+                        {'elementId': 'wind_speed', 'value': 2.5}
+                    ]
+                }
+            ]
+        }
+        
+        result = transform_frost_to_weather_data(frost_response)
+        
+        assert result.data[0].timestamp.tzinfo is not None
+        assert result.data[0].timestamp == datetime.datetime(2026, 2, 5, 12, 30, 0, tzinfo=datetime.timezone.utc)
+    
+    def test_transform_frost_handles_numeric_types(self):
+        """Test that various numeric types are handled correctly."""
+        frost_response = {
+            'data': [
+                {
+                    'referenceTime': '2026-02-05T00:00:00.000Z',
+                    'observations': [
+                        {'elementId': 'air_temperature', 'value': -9},  # int
+                        {'elementId': 'relative_humidity', 'value': 85},  # int
+                        {'elementId': 'wind_speed', 'value': 0.8}  # float
+                    ]
+                }
+            ]
+        }
+        
+        result = transform_frost_to_weather_data(frost_response)
+        
+        assert result.data[0].temperature == -9.0
+        assert result.data[0].humidity == 85.0
+        assert result.data[0].wind_speed == 0.8
+    
+    def test_transform_frost_all_observations_invalid(self):
+        """Test that all invalid observations raises ValueError."""
+        frost_response = {
+            'data': [
+                {
+                    'referenceTime': '2026-02-05T00:00:00.000Z',
+                    'observations': [
+                        {'elementId': 'air_temperature', 'value': 5.2}
+                        # Missing required elements
+                    ]
+                },
+                {
+                    'referenceTime': '2026-02-05T01:00:00.000Z',
+                    'observations': []  # No observations
+                }
+            ]
+        }
+        
+        with pytest.raises(ValueError, match="No valid weather data points"):
+            transform_frost_to_weather_data(frost_response)
