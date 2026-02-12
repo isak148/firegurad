@@ -108,6 +108,103 @@ def transform_met_to_weather_data(met_response: Dict[str, Any]) -> WeatherData:
         raise
 
 
+def transform_frost_to_weather_data(frost_response: Dict[str, Any]) -> WeatherData:
+    """
+    Transform Frost API JSON response to WeatherData format.
+    
+    The Frost API returns observations in this structure:
+    {
+        "data": [
+            {
+                "referenceTime": "2026-02-05T00:00:00.000Z",
+                "observations": [
+                    {
+                        "elementId": "air_temperature",
+                        "value": 5.2
+                    },
+                    {
+                        "elementId": "relative_humidity",
+                        "value": 85.0
+                    },
+                    {
+                        "elementId": "wind_speed",
+                        "value": 3.5
+                    }
+                ]
+            },
+            ...
+        ]
+    }
+    
+    Args:
+        frost_response: JSON response from Frost API as a dictionary
+    
+    Returns:
+        WeatherData object containing the transformed data points
+    
+    Raises:
+        ValueError: If the response format is invalid or missing required fields
+    """
+    try:
+        # Extract the data array from the response
+        if 'data' not in frost_response:
+            raise ValueError("Invalid Frost API response: missing 'data' field")
+        
+        data_array = frost_response['data']
+        if not data_array:
+            raise ValueError("Frost API response contains no data")
+        
+        logger.info(f"Processing {len(data_array)} observations from Frost API response")
+        
+        weather_data_points: List[WeatherDataPoint] = []
+        
+        for entry in data_array:
+            try:
+                # Extract timestamp
+                time_str = entry['referenceTime']
+                timestamp = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                
+                # Extract observations and organize by element
+                observations = entry.get('observations', [])
+                values = {}
+                
+                for obs in observations:
+                    element_id = obs.get('elementId', '')
+                    value = obs.get('value')
+                    if value is not None:
+                        values[element_id] = float(value)
+                
+                # Check if we have all required values
+                if 'air_temperature' not in values or 'relative_humidity' not in values or 'wind_speed' not in values:
+                    logger.warning(f"Skipping observation at {time_str}: missing required elements")
+                    continue
+                
+                # Create WeatherDataPoint
+                data_point = WeatherDataPoint(
+                    timestamp=timestamp,
+                    temperature=values['air_temperature'],
+                    humidity=values['relative_humidity'],
+                    wind_speed=values['wind_speed']
+                )
+                
+                weather_data_points.append(data_point)
+                
+            except (KeyError, ValueError, TypeError) as e:
+                logger.warning(f"Skipping observation due to error: {e}")
+                continue
+        
+        if not weather_data_points:
+            raise ValueError("No valid weather data points could be extracted from Frost API response")
+        
+        logger.info(f"Successfully transformed {len(weather_data_points)} data points from Frost API")
+        
+        return WeatherData(data=weather_data_points)
+        
+    except Exception as e:
+        logger.error(f"Error transforming Frost API response: {e}")
+        raise
+
+
 def fetch_and_transform_weather_data(latitude: float, longitude: float, altitude: int = 0) -> WeatherData:
     """
     Convenience function to fetch and transform weather data in one call.
