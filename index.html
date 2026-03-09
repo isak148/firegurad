@@ -429,7 +429,39 @@
 
         // Configuration
         const MET_API_ENDPOINT = 'https://api.met.no/weatherapi/locationforecast/2.0/compact';
-        const BACKEND_API_ENDPOINT = window.location.protocol + '//' + window.location.hostname + ':8000';
+        const BACKEND_API_CANDIDATES = (() => {
+            const protocol = window.location.protocol;
+            const hostname = window.location.hostname || 'localhost';
+            const origin = window.location.origin;
+
+            const candidates = [];
+
+            if (origin && origin !== 'null') {
+                candidates.push(`${origin}/api`);
+                candidates.push(origin);
+            }
+
+            candidates.push(`${protocol}//${hostname}:8443`);
+            candidates.push(`${protocol}//${hostname}:8000`);
+            candidates.push(`https://${hostname}:8443`);
+            candidates.push(`http://${hostname}:8000`);
+
+            return [...new Set(candidates)];
+        })();
+
+        async function resolveBackendApiEndpoint() {
+            for (const candidate of BACKEND_API_CANDIDATES) {
+                try {
+                    const response = await fetch(`${candidate}/health`, { method: 'GET' });
+                    if (response.ok) {
+                        return candidate;
+                    }
+                } catch (error) {
+                    // Try next candidate endpoint
+                }
+            }
+            throw new Error('Could not resolve backend API endpoint');
+        }
         const USER_AGENT = 'fireguard/0.1.0 github.com/isak148/firegurad';
         
         // TTF (Time to Flashover) Risk Thresholds (in minutes)
@@ -770,7 +802,8 @@
                 
                 // Fetch stored historical data from backend database API
                 console.log('Fetching stored historical data from backend API...');
-                const url = `${BACKEND_API_ENDPOINT}/historical/stored?days=7`;
+                const backendApi = await resolveBackendApiEndpoint();
+                const url = `${backendApi}/historical/stored?days=7`;
                 
                 const response = await fetch(url);
                 if (!response.ok) {
@@ -809,7 +842,7 @@
                 // Show user-friendly error message
                 let errorMessage = 'Failed to load historic data. ';
                 if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                    errorMessage += 'Could not connect to backend API. Make sure the API server is running on port 8000.';
+                    errorMessage += 'Could not connect to backend API. Start the API server, or run via Docker Compose so /api proxy is available.';
                 } else {
                     errorMessage += error.message;
                 }
