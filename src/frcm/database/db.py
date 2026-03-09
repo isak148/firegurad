@@ -1,4 +1,4 @@
-"""Database implementation for caching weather data and fire risk results."""
+"""Database implementation for caching weather data, predictions, and historical records."""
 import sqlite3
 import json
 import hashlib
@@ -49,6 +49,18 @@ class Database:
             )
         """)
         
+        # Table for append-only historical weather snapshots
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS historical_weather_data (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                location_name TEXT,
+                start_time TEXT NOT NULL,
+                end_time TEXT NOT NULL,
+                data_json TEXT NOT NULL,
+                fetched_at TEXT NOT NULL
+            )
+        """)
+
         # Create index for faster lookups
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_weather_hash 
@@ -58,6 +70,11 @@ class Database:
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_prediction_hash 
             ON fire_risk_predictions(weather_data_hash)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_historical_location_time
+            ON historical_weather_data(location_name, fetched_at)
         """)
         
         self.conn.commit()
@@ -169,6 +186,64 @@ class Database:
             prediction_json = row[0]
             return dm.FireRiskPrediction.model_validate_json(prediction_json)
         return None
+
+    def store_historical_weather_data(self, weather_data: dm.WeatherData,
+                                      location_name: Optional[str] = None) -> None:
+        """Store weather data as an append-only historical snapshot.
+
+        Args:
+            weather_data: Weather data snapshot to store
+            location_name: Optional location name associated with the snapshot
+        """
+        data_json = weather_data.to_json()
+
+        if len(weather_data.data) > 0:
+            start_time = weather_data.data[0].timestamp.isoformat()
+            end_time = weather_data.data[-1].timestamp.isoformat()
+        else:
+            now = datetime.now(timezone.utc).isoformat()
+            start_time = now
+            end_time = now
+
+        fetched_at = datetime.now(timezone.utc).isoformat()
+
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            INSERT INTO historical_weather_data (location_name, start_time, end_time, data_json, fetched_at)
+            VALUES (?, ?, ?, ?, ?)
+        """, (location_name, start_time, end_time, data_json, fetched_at))
+        self.conn.commit()
+
+    def get_historical_weather_data(self, location_name: Optional[str] = None,
+                                    limit: Optional[int] = None) -> list[dm.WeatherData]:
+        """Retrieve historical weather snapshots.
+
+        Args:
+            location_name: Optional location to filter by
+            limit: Optional max number of snapshots (most recent first)
+
+        Returns:
+            List of WeatherData snapshots in descending fetch time order
+        """
+        cursor = self.conn.cursor()
+
+        query = "SELECT data_json FROM historical_weather_data"
+        params = []
+
+        if location_name is not None:
+            query += " WHERE location_name = ?"
+            params.append(location_name)
+
+        query += " ORDER BY fetched_at DESC"
+
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+
+        return [dm.WeatherData.model_validate_json(row[0]) for row in rows]
     
     def close(self):
         """Close database connection."""

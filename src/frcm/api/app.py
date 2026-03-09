@@ -9,6 +9,7 @@ import logging
 
 from frcm.datamodel.model import WeatherDataPoint, WeatherData, FireRiskPrediction
 from frcm.fireriskmodel.compute import compute
+from frcm.database import Database
 from .auth import verify_api_key
 from .config import settings
 
@@ -96,6 +97,7 @@ async def api_info():
             "/health": "Health check",
             "/calculate": "Calculate fire risk (POST) - requires authentication",
             "/historical": "Get historical weather data and fire risk (GET)",
+            "/historical/stored": "Get database-stored historical data grouped by day (GET)",
             "/api-info": "API information and usage",
             "/docs": "Interactive API documentation (Swagger UI)" + (" - HTTPS only" if settings.REQUIRE_HTTPS else ""),
             "/redoc": "Alternative API documentation" + (" - HTTPS only" if settings.REQUIRE_HTTPS else "")
@@ -225,4 +227,65 @@ async def get_historical_data(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch historical data: {str(e)}"
+        )
+
+
+@app.get("/historical/stored")
+async def get_stored_historical_data(
+    days: int = Query(7, description="Number of days of stored historical data", ge=1, le=90),
+    location_name: Optional[str] = Query(None, description="Optional location filter")
+):
+    """Get stored historical weather snapshots from local database, grouped by day."""
+    try:
+        db_path = os.environ.get('FRCM_DATABASE_PATH', 'frcm_cache.db')
+        db = Database(db_path)
+        snapshots = db.get_historical_weather_data(location_name=location_name)
+        db.close()
+
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        cutoff = now_utc - datetime.timedelta(days=days)
+
+        grouped: dict[str, list[dict]] = {}
+
+        for snapshot in snapshots:
+            prediction = compute(snapshot)
+
+            for weather_point, risk_point in zip(snapshot.data, prediction.firerisks):
+                point_time = weather_point.timestamp
+                if point_time.tzinfo is None:
+                    point_time = point_time.replace(tzinfo=datetime.timezone.utc)
+
+                if point_time < cutoff:
+                    continue
+
+                day_key = point_time.date().isoformat()
+                grouped.setdefault(day_key, []).append({
+                    "timestamp": point_time.isoformat(),
+                    "temperature": weather_point.temperature,
+                    "humidity": weather_point.humidity,
+                    "wind_speed": weather_point.wind_speed,
+                    "ttf": risk_point.ttf,
+                })
+
+        days_payload = []
+        for day_key in sorted(grouped.keys()):
+            entries = sorted(grouped[day_key], key=lambda entry: entry["timestamp"])
+            days_payload.append({
+                "date": day_key,
+                "entries": entries,
+            })
+
+        total_entries = sum(len(day["entries"]) for day in days_payload)
+
+        return {
+            "location_name": location_name,
+            "days": days_payload,
+            "total_days": len(days_payload),
+            "total_entries": total_entries,
+        }
+    except Exception as e:
+        logger.error(f"Error fetching stored historical data: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch stored historical data: {str(e)}"
         )

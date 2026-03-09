@@ -57,6 +57,59 @@ class TestPublicEndpoints:
         assert "input_format" in data
         assert "output_format" in data
 
+    @patch("frcm.api.app.Database")
+    @patch("frcm.api.app.compute")
+    def test_stored_historical_endpoint(self, mock_compute, mock_database, client):
+        """Test database-backed historical endpoint returns grouped day data."""
+        weather_data = WeatherData(data=[
+            WeatherDataPoint(
+                timestamp=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=2),
+                temperature=6.0,
+                humidity=80.0,
+                wind_speed=3.5
+            ),
+            WeatherDataPoint(
+                timestamp=datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(hours=1),
+                temperature=7.0,
+                humidity=78.0,
+                wind_speed=4.0
+            )
+        ])
+
+        prediction = FireRiskPrediction(firerisks=[
+            FireRisk(timestamp=weather_data.data[0].timestamp, ttf=12.0),
+            FireRisk(timestamp=weather_data.data[1].timestamp, ttf=10.0),
+        ])
+
+        db_instance = MagicMock()
+        db_instance.get_historical_weather_data.return_value = [weather_data]
+        mock_database.return_value = db_instance
+        mock_compute.return_value = prediction
+
+        response = client.get("/historical/stored?days=7")
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert "days" in payload
+        assert payload["total_entries"] == 2
+        assert len(payload["days"]) >= 1
+        assert "entries" in payload["days"][0]
+
+    @patch("frcm.api.app.Database")
+    def test_stored_historical_endpoint_empty(self, mock_database, client):
+        """Test database-backed historical endpoint with no stored snapshots."""
+        db_instance = MagicMock()
+        db_instance.get_historical_weather_data.return_value = []
+        mock_database.return_value = db_instance
+
+        response = client.get("/historical/stored?days=7")
+        assert response.status_code == 200
+
+        payload = response.json()
+        assert payload["total_days"] == 0
+        assert payload["total_entries"] == 0
+        assert payload["days"] == []
+
 
 class TestAuthenticationDisabled:
     """Test API behavior when authentication is disabled."""

@@ -16,6 +16,7 @@ from decouple import config
 from frcm.worker.harvester import WeatherHarvester, MetNoAPIError
 from frcm.worker.locations import LocationConfig
 from frcm.fireriskmodel.compute import compute
+from frcm.database import Database
 
 logging.basicConfig(
     level=logging.INFO,
@@ -37,7 +38,8 @@ class ScheduledHarvester:
         locations_file: str,
         output_dir: str = ".",
         update_interval: int = 60,
-        forecast_hours: int = 48
+        forecast_hours: int = 48,
+        db_path: str = "frcm_cache.db"
     ):
         """
         Initialize the scheduled harvester.
@@ -47,11 +49,13 @@ class ScheduledHarvester:
             output_dir: Directory to save output files
             update_interval: Update interval in seconds (default: 60 = 1 minute)
             forecast_hours: Number of hours to fetch in forecast (default: 48)
+            db_path: Path to SQLite database file for historical storage
         """
         self.locations_file = Path(locations_file)
         self.output_dir = Path(output_dir)
         self.update_interval = update_interval
         self.forecast_hours = forecast_hours
+        self.db_path = db_path
         self.running = False
         
         # Validate inputs
@@ -67,6 +71,7 @@ class ScheduledHarvester:
         
         # Initialize harvester
         self.harvester = WeatherHarvester()
+        self.database = Database(self.db_path)
         
         # Setup signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -107,6 +112,13 @@ class ScheduledHarvester:
                     )
                 
                 logger.info(f"Fetched {len(weather_data.data)} weather data points")
+
+                # Persist every fetched dataset as historical record
+                self.database.store_historical_weather_data(
+                    weather_data,
+                    location_name=location.name
+                )
+                logger.info(f"Saved historical weather data to database ({self.db_path})")
                 
                 # Save raw weather data
                 weather_csv = self.output_dir / f"{location.name.lower().replace(' ', '_')}_weather.csv"
@@ -159,6 +171,7 @@ class ScheduledHarvester:
     def stop(self):
         """Stop the scheduled harvester."""
         self.running = False
+        self.database.close()
 
 
 def main():
@@ -207,6 +220,11 @@ Environment variables (loaded from .env):
         default=config('FRCM_WORKER_FORECAST_HOURS', default=48, cast=int),
         help='Number of hours to fetch in forecast (default: 48)'
     )
+    parser.add_argument(
+        '--db-path',
+        default=config('FRCM_DATABASE_PATH', default='frcm_cache.db'),
+        help='Path to SQLite database file for historical data (default: frcm_cache.db)'
+    )
     
     args = parser.parse_args()
     
@@ -215,7 +233,8 @@ Environment variables (loaded from .env):
             locations_file=args.locations,
             output_dir=args.output,
             update_interval=args.interval,
-            forecast_hours=args.forecast_hours
+            forecast_hours=args.forecast_hours,
+            db_path=args.db_path
         )
         harvester.run()
     except KeyboardInterrupt:

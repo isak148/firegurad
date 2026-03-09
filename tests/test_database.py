@@ -77,6 +77,13 @@ def test_database_initialization(temp_db):
     """)
     assert cursor.fetchone() is not None
 
+    # Check historical_weather_data table exists
+    cursor.execute("""
+        SELECT name FROM sqlite_master 
+        WHERE type='table' AND name='historical_weather_data'
+    """)
+    assert cursor.fetchone() is not None
+
 
 def test_store_and_retrieve_weather_data(temp_db, sample_weather_data):
     """Test storing and retrieving weather data."""
@@ -164,3 +171,29 @@ def test_different_data_different_hash(temp_db, sample_weather_data):
     hash2 = temp_db._compute_hash(modified_data)
     
     assert hash1 != hash2
+
+
+def test_store_historical_weather_data_appends(temp_db, sample_weather_data):
+    """Test that historical data stores all snapshots (append-only)."""
+    temp_db.store_historical_weather_data(sample_weather_data, location_name="Bergen")
+    temp_db.store_historical_weather_data(sample_weather_data, location_name="Bergen")
+
+    cursor = temp_db.conn.cursor()
+    cursor.execute("SELECT COUNT(*) FROM historical_weather_data WHERE location_name = ?", ("Bergen",))
+    count = cursor.fetchone()[0]
+
+    assert count == 2
+
+
+def test_get_historical_weather_data_with_limit_and_filter(temp_db, sample_weather_data):
+    """Test retrieving historical snapshots with location filtering and limit."""
+    temp_db.store_historical_weather_data(sample_weather_data, location_name="Bergen")
+    temp_db.store_historical_weather_data(sample_weather_data, location_name="Bergen")
+    temp_db.store_historical_weather_data(sample_weather_data, location_name="Oslo")
+
+    bergen_results = temp_db.get_historical_weather_data(location_name="Bergen")
+    limited_results = temp_db.get_historical_weather_data(location_name="Bergen", limit=1)
+
+    assert len(bergen_results) == 2
+    assert len(limited_results) == 1
+    assert isinstance(limited_results[0], WeatherData)

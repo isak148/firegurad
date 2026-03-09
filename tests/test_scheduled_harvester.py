@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 from frcm.worker.scheduled_harvester import ScheduledHarvester
 from frcm.datamodel.model import WeatherData, WeatherDataPoint
 from frcm.worker.locations import Location
+from frcm.database import Database
 
 
 @pytest.fixture
@@ -113,6 +114,8 @@ class TestScheduledHarvester:
         mock_weather_data
     ):
         """Test fetch_and_process method."""
+        db_path = str(Path(temp_output_dir) / "test_historical.db")
+
         # Setup mocks
         mock_harvester_instance = Mock()
         mock_harvester_class.return_value = mock_harvester_instance
@@ -125,7 +128,8 @@ class TestScheduledHarvester:
         # Create harvester
         harvester = ScheduledHarvester(
             locations_file=temp_locations_file,
-            output_dir=temp_output_dir
+            output_dir=temp_output_dir,
+            db_path=db_path
         )
         
         # Run fetch_and_process
@@ -140,6 +144,12 @@ class TestScheduledHarvester:
         # Verify CSV files were created
         weather_csv = Path(temp_output_dir) / "testlocation_weather.csv"
         assert weather_csv.exists()
+
+        # Verify historical data was written to database
+        db = Database(db_path)
+        history = db.get_historical_weather_data(location_name="TestLocation")
+        db.close()
+        assert len(history) == 1
     
     @patch('frcm.worker.scheduled_harvester.WeatherHarvester')
     def test_fetch_and_process_handles_api_error(

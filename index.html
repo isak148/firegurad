@@ -768,9 +768,9 @@
                 errorEl.classList.add('hidden');
                 dataEl.classList.add('hidden');
                 
-                // Fetch real historic data from backend API
-                console.log('Fetching historical data from backend API...');
-                const url = `${BACKEND_API_ENDPOINT}/historical?latitude=${LOCATION.latitude}&longitude=${LOCATION.longitude}&days=7`;
+                // Fetch stored historical data from backend database API
+                console.log('Fetching stored historical data from backend API...');
+                const url = `${BACKEND_API_ENDPOINT}/historical/stored?days=7`;
                 
                 const response = await fetch(url);
                 if (!response.ok) {
@@ -780,17 +780,22 @@
                 const apiData = await response.json();
                 console.log('Received historical data:', apiData);
                 
-                // Transform API data to display format
-                const historicData = transformHistoricalApiData(apiData);
-                
                 // Clear container
                 containerEl.innerHTML = '';
                 
-                // Display historic data grouped by day
-                historicData.forEach(day => {
-                    const dayCard = createDayCard(day);
-                    containerEl.appendChild(dayCard);
-                });
+                if (!apiData.days || apiData.days.length === 0) {
+                    containerEl.innerHTML = `
+                        <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-slate-600">
+                            No stored historical data found yet. Start the scheduled harvester to collect historical entries.
+                        </div>
+                    `;
+                } else {
+                    // Display full day-by-day data with all entries
+                    apiData.days.forEach(day => {
+                        const dayCard = createHistoricDayCard(day);
+                        containerEl.appendChild(dayCard);
+                    });
+                }
                 
                 window.historicDataLoaded = true;
                 
@@ -803,9 +808,7 @@
                 
                 // Show user-friendly error message
                 let errorMessage = 'Failed to load historic data. ';
-                if (error.message.includes('503')) {
-                    errorMessage += 'Historical data service is not configured on the backend. Please set FRCM_FROST_CLIENT_ID environment variable.';
-                } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
                     errorMessage += 'Could not connect to backend API. Make sure the API server is running on port 8000.';
                 } else {
                     errorMessage += error.message;
@@ -818,58 +821,81 @@
         }
 
         /**
-         * Transform historical API data to display format
-         * Groups data by day and calculates daily averages
+         * Determine the style classes for a TTF value
          */
-        function transformHistoricalApiData(apiData) {
-            const dayMap = new Map();
-            
-            // Process weather data and fire risk together
-            for (let i = 0; i < apiData.weather_data.length; i++) {
-                const weatherPoint = apiData.weather_data[i];
-                const riskPoint = apiData.fire_risk[i];
-                
-                const date = new Date(weatherPoint.timestamp);
-                const dayKey = date.toISOString().split('T')[0];
-                
-                if (!dayMap.has(dayKey)) {
-                    dayMap.set(dayKey, {
-                        date: new Date(dayKey),
-                        temperatures: [],
-                        humidities: [],
-                        windSpeeds: [],
-                        ttfs: []
-                    });
-                }
-                
-                const dayData = dayMap.get(dayKey);
-                dayData.temperatures.push(weatherPoint.temperature);
-                dayData.humidities.push(weatherPoint.humidity);
-                dayData.windSpeeds.push(weatherPoint.wind_speed);
-                dayData.ttfs.push(riskPoint.ttf);
+        function getTTFStyle(ttf) {
+            if (ttf < TTF_VERY_HIGH_RISK) {
+                return { text: 'text-red-600', bg: 'bg-red-100' };
             }
-            
-            // Calculate averages for each day
-            const result = [];
-            for (const [dayKey, dayData] of dayMap) {
-                const avgTemp = dayData.temperatures.reduce((a, b) => a + b, 0) / dayData.temperatures.length;
-                const avgHumidity = dayData.humidities.reduce((a, b) => a + b, 0) / dayData.humidities.length;
-                const avgWindSpeed = dayData.windSpeeds.reduce((a, b) => a + b, 0) / dayData.windSpeeds.length;
-                const avgTTF = dayData.ttfs.reduce((a, b) => a + b, 0) / dayData.ttfs.length;
-                
-                result.push({
-                    date: dayData.date,
-                    temperature: avgTemp,
-                    humidity: avgHumidity,
-                    windSpeed: avgWindSpeed,
-                    ttf: avgTTF
+            if (ttf <= TTF_HIGH_RISK) {
+                return { text: 'text-yellow-600', bg: 'bg-yellow-100' };
+            }
+            return { text: 'text-green-600', bg: 'bg-green-100' };
+        }
+
+        /**
+         * Create a historic day card with all recorded entries for the day
+         */
+        function createHistoricDayCard(dayData) {
+            const card = document.createElement('div');
+            card.className = 'bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl p-6 border border-slate-200';
+
+            const date = new Date(`${dayData.date}T00:00:00`);
+            const dateStr = date.toLocaleDateString('en-US', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+
+            const rows = dayData.entries.map(entry => {
+                const style = getTTFStyle(entry.ttf);
+                const time = new Date(entry.timestamp).toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit'
                 });
-            }
-            
-            // Sort by date (oldest first)
-            result.sort((a, b) => a.date - b.date);
-            
-            return result;
+
+                return `
+                    <tr class="border-b border-slate-100 last:border-b-0">
+                        <td class="py-2 pr-2 text-sm text-slate-700">${time}</td>
+                        <td class="py-2 pr-2 text-sm text-slate-900">${entry.temperature.toFixed(1)}°C</td>
+                        <td class="py-2 pr-2 text-sm text-slate-900">${entry.humidity.toFixed(1)}%</td>
+                        <td class="py-2 pr-2 text-sm text-slate-900">${entry.wind_speed.toFixed(1)} m/s</td>
+                        <td class="py-2 text-sm">
+                            <span class="px-2 py-1 rounded-full font-semibold ${style.bg} ${style.text}">
+                                ${entry.ttf.toFixed(1)} min
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            card.innerHTML = `
+                <div class="flex justify-between items-start mb-4">
+                    <div>
+                        <h4 class="font-bold text-slate-900">${dateStr}</h4>
+                        <p class="text-xs text-slate-500 mt-1">${dayData.entries.length} entries</p>
+                    </div>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full">
+                        <thead>
+                            <tr class="border-b border-slate-200 text-left">
+                                <th class="py-2 pr-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Time</th>
+                                <th class="py-2 pr-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Temperature</th>
+                                <th class="py-2 pr-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Humidity</th>
+                                <th class="py-2 pr-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">Wind Speed</th>
+                                <th class="py-2 text-xs font-semibold text-slate-500 uppercase tracking-wider">TTF</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+
+            return card;
         }
 
         /**
