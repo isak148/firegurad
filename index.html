@@ -430,27 +430,79 @@
 
         // Configuration
         const MET_API_ENDPOINT = 'https://api.met.no/weatherapi/locationforecast/2.0/compact';
-        const BACKEND_API_CANDIDATES = (() => {
+        const DEFAULT_VM_HOST = '158.37.66.156';
+
+        function normalizeBaseUrl(url) {
+            if (!url) return '';
+            return String(url).trim().replace(/\/$/, '');
+        }
+
+        function buildBackendApiCandidates() {
             const protocol = window.location.protocol;
-            const hostname = window.location.hostname || 'localhost';
+            const hostname = window.location.hostname;
             const origin = window.location.origin;
+            const isFileProtocol = protocol === 'file:';
+
+            // Override order: query param -> global variable -> localStorage
+            // Examples:
+            // - ?backend=http://158.37.66.156/api
+            // - window.FIREGUARD_BACKEND_API = 'http://158.37.66.156/api'
+            // - localStorage.setItem('fireguard.backendApi', 'http://158.37.66.156/api')
+            const backendFromQuery = new URLSearchParams(window.location.search).get('backend');
+            const backendFromGlobal = window.FIREGUARD_BACKEND_API || '';
+            const backendFromStorage = window.localStorage.getItem('fireguard.backendApi') || '';
+            const backendOverride = normalizeBaseUrl(backendFromQuery || backendFromGlobal || backendFromStorage);
 
             const candidates = [];
+            const addCandidate = (candidate) => {
+                const normalized = normalizeBaseUrl(candidate);
+                if (!normalized || candidates.includes(normalized)) {
+                    return;
+                }
+                candidates.push(normalized);
+            };
 
-            if (origin && origin !== 'null') {
-                candidates.push(`${origin}/api`);
-                candidates.push(origin);
+            const addBaseWithApiVariant = (baseUrl) => {
+                const normalized = normalizeBaseUrl(baseUrl);
+                if (!normalized) return;
+
+                // Prefer /api for reverse-proxy setups, then direct base.
+                if (!normalized.endsWith('/api')) {
+                    addCandidate(`${normalized}/api`);
+                }
+                addCandidate(normalized);
+            };
+
+            if (backendOverride) {
+                addBaseWithApiVariant(backendOverride);
             }
 
-            candidates.push(`${protocol}//${hostname}:8443`);
-            candidates.push(`${protocol}//${hostname}:8000`);
-            candidates.push(`https://${hostname}:8443`);
-            candidates.push(`http://${hostname}:8000`);
+            if (origin && origin !== 'null') {
+                addCandidate(`${origin}/api`);
+                addCandidate(origin);
+            }
 
-            return [...new Set(candidates)];
-        })();
+            if (!isFileProtocol && hostname) {
+                addCandidate(`https://${hostname}:8443`);
+                addCandidate(`http://${hostname}:8000`);
+            }
+
+            // File-based hosting has no reliable origin/hostname.
+            // In that case, try the known VM host instead of localhost.
+            if (isFileProtocol || !hostname) {
+                addCandidate(`http://${DEFAULT_VM_HOST}/api`);
+                addCandidate(`http://${DEFAULT_VM_HOST}`);
+                addCandidate(`https://${DEFAULT_VM_HOST}:8443`);
+            }
+
+            return candidates;
+        }
+
+        const BACKEND_API_CANDIDATES = buildBackendApiCandidates();
 
         async function resolveBackendApiEndpoint() {
+            let lastError = null;
+
             for (const candidate of BACKEND_API_CANDIDATES) {
                 try {
                     const response = await fetch(`${candidate}/health`, { method: 'GET' });
@@ -458,10 +510,14 @@
                         return candidate;
                     }
                 } catch (error) {
+                    lastError = error;
                     // Try next candidate endpoint
                 }
             }
-            throw new Error('Could not resolve backend API endpoint');
+
+            const tried = BACKEND_API_CANDIDATES.join(', ');
+            const reason = lastError && lastError.message ? ` Last error: ${lastError.message}` : '';
+            throw new Error(`Could not resolve backend API endpoint. Tried: ${tried}.${reason}`);
         }
         const USER_AGENT = 'fireguard/0.1.0 github.com/isak148/firegurad';
         
@@ -842,8 +898,8 @@
                 
                 // Show user-friendly error message
                 let errorMessage = 'Failed to load historic data. ';
-                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-                    errorMessage += 'Could not connect to backend API. Start the API server, or run via Docker Compose so /api proxy is available.';
+                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('Could not resolve backend API endpoint')) {
+                    errorMessage += 'Could not connect to backend API. Open this page via http://158.37.66.156 (not file://), or set ?backend=http://158.37.66.156/api.';
                 } else {
                     errorMessage += error.message;
                 }
