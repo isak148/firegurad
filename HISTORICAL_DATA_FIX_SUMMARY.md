@@ -65,11 +65,21 @@ Add this line to `.env`:
 FRCM_FROST_CLIENT_ID=your-client-id-here
 ```
 
+Activate the project virtual environment before running commands:
+
+```bash
+# Windows (PowerShell)
+.venv\Scripts\Activate.ps1
+
+# Linux/macOS
+source .venv/bin/activate
+```
+
 ### 3. Start the API Server
 
 ```bash
 # Option 1: Using Python
-python3 -m frcm.api.server
+python -m frcm.api.server
 
 # Option 2: Using installed command
 frcm-api
@@ -87,13 +97,13 @@ Open `index.html` in a web browser. Click on the "Historic Data" tab to see real
 
 ```bash
 # Test Frost client
-python3 -m pytest tests/met_integration/test_frost_client.py -v
+python -m pytest tests/met_integration/test_frost_client.py -v
 
 # Test transform functions  
-python3 -m pytest tests/met_integration/test_transform.py::TestTransformFrostToWeatherData -v
+python -m pytest tests/met_integration/test_transform.py::TestTransformFrostToWeatherData -v
 
 # Test all MET integration
-python3 -m pytest tests/met_integration/ -v
+python -m pytest tests/met_integration/ -v
 ```
 
 **Result**: All 37 tests pass ✓
@@ -101,7 +111,7 @@ python3 -m pytest tests/met_integration/ -v
 ### Run Manual Integration Test
 
 ```bash
-python3 manual_test_historical.py
+python manual_test_historical.py
 ```
 
 **Result**: All 3 integration tests pass ✓
@@ -197,7 +207,7 @@ FRCM_CORS_ORIGINS=https://yourdomain.com,https://www.yourdomain.com
 
 3. **"Could not connect to backend API"**
    - Cause: API server not running
-   - Solution: Start API server with `python3 -m frcm.api.server`
+   - Solution: Start API server with `python -m frcm.api.server`
 
 4. **"No weather stations near location"**
    - Cause: Frost API has no data for that location
