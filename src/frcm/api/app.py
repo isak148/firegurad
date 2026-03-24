@@ -164,6 +164,7 @@ async def api_info():
             "/": "API information",
             "/health": "Health check",
             "/locations/search": "Search locations from MET/Yr (GET)",
+            "/risk/current": "Get current fire risk TTF from backend model (GET)",
             "/calculate": "Calculate fire risk (POST) - requires authentication",
             "/historical": "Get historical weather data and fire risk (GET)",
             "/historical/stored": "Get database-stored historical data grouped by day (GET)",
@@ -198,6 +199,56 @@ async def api_info():
             ]
         }
     }
+
+
+@app.get("/risk/current")
+async def get_current_risk(
+    latitude: float = Query(..., description="Latitude coordinate", ge=-90, le=90),
+    longitude: float = Query(..., description="Longitude coordinate", ge=-180, le=180),
+):
+    """Get current TTF using backend weather preprocessing and fire risk model."""
+    try:
+        from frcm.met_integration.client import METClient
+        from frcm.met_integration.transform import transform_met_to_weather_data
+
+        with METClient() as met_client:
+            met_response = met_client.fetch_weather_data(latitude=latitude, longitude=longitude)
+
+        weather_data = transform_met_to_weather_data(met_response)
+        fire_risk_prediction = compute(weather_data)
+
+        if not fire_risk_prediction.firerisks:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No fire risk data available for this location",
+            )
+
+        current = fire_risk_prediction.firerisks[0]
+        return {
+            "latitude": latitude,
+            "longitude": longitude,
+            "timestamp": current.timestamp.isoformat(),
+            "ttf": current.ttf,
+            "model": "frcm-backend",
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except HTTPException:
+        raise
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Unable to fetch weather data for current risk: {str(e)}",
+        )
+    except Exception as e:
+        logger.error(f"Error fetching current risk data: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch current risk data: {str(e)}",
+        )
 
 
 @app.get("/historical")
