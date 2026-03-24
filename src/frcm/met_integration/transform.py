@@ -192,6 +192,7 @@ def transform_frost_to_weather_data(frost_response: Dict[str, Any]) -> WeatherDa
 
         weather_data_points: List[WeatherDataPoint] = []
         required_elements = {'air_temperature', 'relative_humidity'}
+        wind_fallback_count = 0
 
         for time_str in sorted(merged_by_time.keys()):
             values = merged_by_time[time_str]
@@ -201,11 +202,15 @@ def transform_frost_to_weather_data(frost_response: Dict[str, Any]) -> WeatherDa
 
             try:
                 timestamp = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
+                wind_val = values.get('wind_speed', None)
+                if wind_val is None:
+                    wind_fallback_count += 1
+                    wind_val = 0.0
                 data_point = WeatherDataPoint(
                     timestamp=timestamp,
                     temperature=values['air_temperature'],
                     humidity=values['relative_humidity'],
-                    wind_speed=values.get('wind_speed', 0.0)
+                    wind_speed=wind_val
                 )
                 weather_data_points.append(data_point)
             except (ValueError, TypeError) as e:
@@ -214,6 +219,12 @@ def transform_frost_to_weather_data(frost_response: Dict[str, Any]) -> WeatherDa
         
         if not weather_data_points:
             raise ValueError("No valid weather data points could be extracted from Frost API response")
+        
+        if wind_fallback_count > 0:
+            logger.warning(
+                f"Wind speed fallback used for {wind_fallback_count}/{len(weather_data_points)} observations. "
+                f"({100*wind_fallback_count/len(weather_data_points):.1f}% using 0.0 default)"
+            )
         
         logger.info(f"Successfully transformed {len(weather_data_points)} data points from Frost API")
         

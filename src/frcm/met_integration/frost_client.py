@@ -178,6 +178,7 @@ class FrostClient:
         last_error_detail = ""
 
         query_variants = self.ELEMENT_QUERY_VARIANTS.get(element, [element])
+        logger.debug(f"Trying {len(query_variants)} variants for element={element}: {query_variants}")
 
         for requested_element in query_variants:
             candidate_sources = self._resolve_candidate_source_ids(
@@ -187,6 +188,8 @@ class FrostClient:
                 end_str=end_str,
                 element=requested_element,
             )
+
+            logger.debug(f"Resolved {len(candidate_sources)} sources for element={requested_element}: {candidate_sources[:3]}...")
 
             for source_id in candidate_sources:
                 for use_hourly_resolution in (True, False):
@@ -233,8 +236,8 @@ class FrostClient:
         )
         if element == 'wind_speed':
             logger.warning(
-                "No Frost wind_speed series found for requested range. "
-                "Proceeding with fallback wind_speed imputation in transform layer."
+                f"WIND FALLBACK TRIGGERED: No Frost wind_speed series found at lat={latitude}, lon={longitude}, range={start_str}/{end_str}. "
+                f"Proceeding with fallback wind_speed imputation (0.0) in transform layer."
             )
             return {"data": []}
 
@@ -282,6 +285,7 @@ class FrostClient:
         """Resolve candidate source IDs that likely have data for given element/time range."""
         candidate_ids: List[str] = []
 
+        # Strategy 1: Query availableTimeSeries with specific element
         params = {
             'referencetime': f'{start_str}/{end_str}',
             'elements': element,
@@ -298,11 +302,36 @@ class FrostClient:
                 if source_id not in candidate_ids:
                     candidate_ids.append(source_id)
             if candidate_ids:
+                logger.info(f"Found {len(candidate_ids)} sources with element={element}")
                 return candidate_ids[:10]
         except (requests.exceptions.RequestException, FrostAPIError) as e:
             logger.warning(f"availableTimeSeries lookup failed for element={element}: {e}")
 
-        # Fallback: at least try nearest source endpoint result.
+        # Strategy 2 (for locations with sparse element coverage): Query for all available sources
+        # at this location, then try the element on those generic sources
+        logger.info(f"Falling back to generic source lookup without element filter for {element}")
+        params_generic = {
+            'referencetime': f'{start_str}/{end_str}',
+            'geometry': f'nearest(POINT({longitude} {latitude}))',
+        }
+
+        try:
+            payload = self._request_frost_json(self.AVAILABLE_TS_URL, params_generic)
+            for row in payload.get('data', []):
+                source_id = row.get('sourceId') or row.get('source') or row.get('id')
+                if not source_id:
+                    continue
+                source_id = str(source_id).split(':')[0]
+                if source_id not in candidate_ids:
+                    candidate_ids.append(source_id)
+            if candidate_ids:
+                logger.info(f"Found {len(candidate_ids)} generic nearby sources (no element filter)")
+                return candidate_ids[:10]
+        except (requests.exceptions.RequestException, FrostAPIError) as e:
+            logger.warning(f"Generic availableTimeSeries lookup also failed: {e}")
+
+        # Strategy 3: Fallback: at least try nearest source endpoint result.
+        logger.info(f"Using nearest source fallback for element={element}")
         return [self._resolve_nearest_source_id(latitude=latitude, longitude=longitude, element=element)]
 
     def close(self):
