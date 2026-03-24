@@ -949,7 +949,7 @@
          * Updates the UI with weather data
          * @param {Object} weatherData - Parsed weather data
          */
-        function updateWeatherDisplay(weatherData, modelTTF = null) {
+        function updateWeatherDisplay(weatherData, modelTTF) {
             // Update temperature
             document.getElementById('temperature-value').textContent = 
                 `${weatherData.temperature.toFixed(1)}°C`;
@@ -968,14 +968,11 @@
             document.getElementById('live-temp').textContent = tempText;
             document.getElementById('live-humidity').textContent = humidityText;
 
-            // Prefer backend model TTF so Current and Historic use the same model family.
-            const ttf = typeof modelTTF === 'number' && !Number.isNaN(modelTTF)
-                ? modelTTF
-                : calculateSimplifiedTTF(
-                    weatherData.temperature,
-                    weatherData.humidity,
-                    weatherData.windSpeed
-                );
+            if (typeof modelTTF !== 'number' || Number.isNaN(modelTTF)) {
+                throw new Error('Current model TTF is unavailable from backend API');
+            }
+
+            const ttf = modelTTF;
             document.getElementById('ttf-value').textContent = `${ttf.toFixed(1)}`;
             
             // Update alert status to reflect TTF risk
@@ -1021,12 +1018,10 @@
                 const weatherData = parseWeatherData(rawData);
                 console.log('Parsed weather data:', weatherData);
 
-                let modelTTF = null;
-                try {
-                    modelTTF = await fetchCurrentRiskTTF(currentLocation.latitude, currentLocation.longitude);
-                } catch (riskError) {
-                    console.warn('Backend current risk unavailable, using simplified fallback TTF:', riskError);
-                }
+                const modelTTF = await fetchCurrentRiskTTF(
+                    currentLocation.latitude,
+                    currentLocation.longitude
+                );
 
                 updateWeatherDisplay(weatherData, modelTTF);
             } catch (error) {
