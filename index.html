@@ -124,8 +124,25 @@
                         <h3 class="text-2xl font-bold text-slate-900">Weather & Fire Risk Data</h3>
                     </div>
                     <div id="weather-location" class="text-sm text-slate-500 font-medium">
-                        <i class="fa-solid fa-location-dot mr-1"></i>Bergen, Norway
+                        <i class="fa-solid fa-location-dot mr-1"></i><span id="weather-location-text">Bergen, Norway</span>
                     </div>
+                </div>
+
+                <div id="location-search-container" class="mb-6">
+                    <label for="location-search-input" class="block text-sm font-semibold text-slate-700 mb-2">
+                        Search location
+                    </label>
+                    <div class="relative">
+                        <input
+                            id="location-search-input"
+                            type="text"
+                            placeholder="Search for Oslo, Bergen, Trondheim..."
+                            autocomplete="off"
+                            class="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-slate-800 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                        />
+                        <div id="location-search-results" class="hidden absolute z-20 mt-2 w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-lg"></div>
+                    </div>
+                    <p id="location-search-status" class="mt-2 text-xs text-slate-500">Type at least 2 letters to search locations.</p>
                 </div>
                 
                 <!-- Tab Navigation -->
@@ -499,14 +516,20 @@
         }
 
         const BACKEND_API_CANDIDATES = buildBackendApiCandidates();
+        let resolvedBackendApiEndpoint = null;
 
         async function resolveBackendApiEndpoint() {
+            if (resolvedBackendApiEndpoint) {
+                return resolvedBackendApiEndpoint;
+            }
+
             let lastError = null;
 
             for (const candidate of BACKEND_API_CANDIDATES) {
                 try {
                     const response = await fetch(`${candidate}/health`, { method: 'GET' });
                     if (response.ok) {
+                        resolvedBackendApiEndpoint = candidate;
                         return candidate;
                     }
                 } catch (error) {
@@ -527,11 +550,194 @@
         // TTF > 15 minutes is considered Low to Moderate Risk
         
         // Bergen, Norway coordinates (example location)
-        const LOCATION = {
+        let currentLocation = {
             name: 'Bergen, Norway',
             latitude: 60.3913,
             longitude: 5.3221
         };
+        let locationSearchDebounceId = null;
+        let latestLocationSearchRequest = 0;
+
+        function setCurrentLocation(location, options = {}) {
+            const { reload = true } = options;
+
+            currentLocation = {
+                name: location.name,
+                latitude: Number(location.latitude),
+                longitude: Number(location.longitude)
+            };
+
+            const locationText = document.getElementById('weather-location-text');
+            locationText.textContent = currentLocation.name;
+
+            if (!reload) {
+                return;
+            }
+
+            window.historicDataLoaded = false;
+            window.futureDataLoaded = false;
+
+            loadWeatherData();
+
+            const isHistoricOpen = !document.getElementById('content-historic').classList.contains('hidden');
+            const isFutureOpen = !document.getElementById('content-future').classList.contains('hidden');
+
+            if (isHistoricOpen) {
+                loadHistoricData();
+            }
+            if (isFutureOpen) {
+                loadFutureData();
+            }
+        }
+
+        function setLocationSearchStatus(message, isError = false) {
+            const statusEl = document.getElementById('location-search-status');
+            statusEl.textContent = message;
+            statusEl.className = isError
+                ? 'mt-2 text-xs text-red-600'
+                : 'mt-2 text-xs text-slate-500';
+        }
+
+        function formatLocationLabel(location) {
+            const parts = [location.name, location.region, location.country].filter(Boolean);
+            return parts.join(', ');
+        }
+
+        function hideLocationSearchResults() {
+            const resultsEl = document.getElementById('location-search-results');
+            resultsEl.classList.add('hidden');
+            resultsEl.innerHTML = '';
+        }
+
+        function renderLocationSearchResults(locations) {
+            const resultsEl = document.getElementById('location-search-results');
+            resultsEl.innerHTML = '';
+
+            if (!locations.length) {
+                hideLocationSearchResults();
+                return;
+            }
+
+            locations.forEach((location) => {
+                const option = document.createElement('button');
+                option.type = 'button';
+                option.className = 'flex w-full items-center justify-between border-b border-slate-100 px-4 py-3 text-left transition hover:bg-slate-50 last:border-b-0';
+
+                const label = document.createElement('span');
+                label.className = 'text-sm font-medium text-slate-800';
+                label.textContent = formatLocationLabel(location);
+
+                const coords = document.createElement('span');
+                coords.className = 'text-xs text-slate-500';
+                coords.textContent = `${location.latitude.toFixed(3)}, ${location.longitude.toFixed(3)}`;
+
+                option.appendChild(label);
+                option.appendChild(coords);
+
+                option.addEventListener('click', () => {
+                    const locationLabel = formatLocationLabel(location);
+                    document.getElementById('location-search-input').value = locationLabel;
+                    setCurrentLocation({
+                        name: locationLabel,
+                        latitude: location.latitude,
+                        longitude: location.longitude,
+                    });
+                    hideLocationSearchResults();
+                    setLocationSearchStatus(`Showing forecast for ${locationLabel}.`);
+                });
+
+                resultsEl.appendChild(option);
+            });
+
+            resultsEl.classList.remove('hidden');
+        }
+
+        async function searchLocations(query) {
+            const backendApi = await resolveBackendApiEndpoint();
+            const response = await fetch(`${backendApi}/locations/search?q=${encodeURIComponent(query)}&limit=8`);
+
+            if (!response.ok) {
+                let detail = response.statusText;
+                try {
+                    const errorPayload = await response.json();
+                    detail = errorPayload.detail || detail;
+                } catch (_) {
+                    // Keep default status text when JSON payload is unavailable.
+                }
+                throw new Error(detail || `HTTP ${response.status}`);
+            }
+
+            const payload = await response.json();
+            return payload.locations || [];
+        }
+
+        async function performLocationSearch(query) {
+            const requestId = ++latestLocationSearchRequest;
+            setLocationSearchStatus('Searching locations...');
+
+            try {
+                const locations = await searchLocations(query);
+
+                if (requestId !== latestLocationSearchRequest) {
+                    return;
+                }
+
+                renderLocationSearchResults(locations);
+
+                if (!locations.length) {
+                    setLocationSearchStatus(`No locations found for "${query}".`);
+                    return;
+                }
+
+                setLocationSearchStatus(`Found ${locations.length} location${locations.length === 1 ? '' : 's'}.`);
+            } catch (error) {
+                if (requestId !== latestLocationSearchRequest) {
+                    return;
+                }
+                hideLocationSearchResults();
+                setLocationSearchStatus(`Location search failed: ${error.message}`, true);
+            }
+        }
+
+        function setupLocationSearch() {
+            const container = document.getElementById('location-search-container');
+            const input = document.getElementById('location-search-input');
+
+            input.addEventListener('input', () => {
+                const query = input.value.trim();
+                clearTimeout(locationSearchDebounceId);
+
+                if (query.length < 2) {
+                    latestLocationSearchRequest += 1;
+                    hideLocationSearchResults();
+                    setLocationSearchStatus('Type at least 2 letters to search locations.');
+                    return;
+                }
+
+                locationSearchDebounceId = setTimeout(() => {
+                    performLocationSearch(query);
+                }, 300);
+            });
+
+            input.addEventListener('focus', () => {
+                const query = input.value.trim();
+                if (query.length >= 2) {
+                    performLocationSearch(query);
+                }
+            });
+
+            input.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    hideLocationSearchResults();
+                }
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!container.contains(event.target)) {
+                    hideLocationSearchResults();
+                }
+            });
+        }
 
         /**
          * Fetches weather data from MET API
@@ -540,7 +746,7 @@
          * @returns {Promise<Object>} Weather data object
          */
         async function fetchWeatherData() {
-            const url = `${MET_API_ENDPOINT}?lat=${LOCATION.latitude}&lon=${LOCATION.longitude}`;
+            const url = `${MET_API_ENDPOINT}?lat=${currentLocation.latitude}&lon=${currentLocation.longitude}`;
             
             try {
                 // Note: User-Agent header is included but will be ignored by browser
@@ -1216,6 +1422,8 @@
 
         // Load weather data when the page loads and start auto-refresh
         document.addEventListener('DOMContentLoaded', () => {
+            setupLocationSearch();
+            setCurrentLocation(currentLocation, { reload: false });
             loadWeatherData();
             startAutoRefresh();
         });

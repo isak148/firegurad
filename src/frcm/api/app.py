@@ -6,6 +6,7 @@ from typing import List, Optional
 import datetime
 import os
 import logging
+import requests
 
 from frcm.datamodel.model import WeatherDataPoint, WeatherData, FireRiskPrediction
 from frcm.fireriskmodel.compute import compute
@@ -49,6 +50,64 @@ async def root():
 async def health():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.get("/locations/search")
+async def search_locations(
+    q: str = Query(..., min_length=2, description="Location search query"),
+    limit: int = Query(8, ge=1, le=20, description="Maximum number of locations to return")
+):
+    """Search locations from MET/Yr location catalog for use with forecasts."""
+    try:
+        response = requests.get(
+            "https://www.yr.no/api/v0/locations/suggest",
+            params={"language": "en", "q": q},
+            headers={"User-Agent": "firegurad/0.1.0 github.com/isak148/firegurad"},
+            timeout=10,
+        )
+        response.raise_for_status()
+
+        payload = response.json()
+        raw_locations = payload.get("_embedded", {}).get("location", [])
+
+        locations = []
+        for loc in raw_locations[:limit]:
+            position = loc.get("position", {})
+            country = loc.get("country", {})
+            region = loc.get("region", {})
+
+            lat = position.get("lat")
+            lon = position.get("lon")
+            if lat is None or lon is None:
+                continue
+
+            locations.append({
+                "id": loc.get("id"),
+                "name": loc.get("name"),
+                "country": country.get("name"),
+                "country_code": country.get("id"),
+                "region": region.get("name"),
+                "latitude": lat,
+                "longitude": lon,
+                "url_path": loc.get("urlPath"),
+            })
+
+        return {
+            "query": q,
+            "count": len(locations),
+            "locations": locations,
+        }
+    except requests.exceptions.Timeout:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="Location search request timed out",
+        )
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Location search failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Location search failed: {str(e)}",
+        )
 
 @app.post("/calculate", response_model=FireRiskPrediction, dependencies=[Depends(verify_api_key)])
 async def calculate_fire_risk(weather_data: WeatherData):
@@ -95,6 +154,7 @@ async def api_info():
         "endpoints": {
             "/": "API information",
             "/health": "Health check",
+            "/locations/search": "Search locations from MET/Yr (GET)",
             "/calculate": "Calculate fire risk (POST) - requires authentication",
             "/historical": "Get historical weather data and fire risk (GET)",
             "/historical/stored": "Get database-stored historical data grouped by day (GET)",
