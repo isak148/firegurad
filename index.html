@@ -1295,12 +1295,13 @@
                 errorEl.classList.add('hidden');
                 dataEl.classList.add('hidden');
                 
-                // Fetch future forecast data from MET API
-                const rawData = await fetchWeatherData();
-                const timeseries = rawData.properties.timeseries;
-                
-                // Group data by day
-                const futureData = groupForecastByDay(timeseries);
+                // Fetch forecast weather+TTF from backend model API
+                const backendApi = await resolveBackendApiEndpoint();
+                const url = `${backendApi}/risk/forecast?latitude=${encodeURIComponent(currentLocation.latitude)}&longitude=${encodeURIComponent(currentLocation.longitude)}&days=7`;
+                const apiData = await fetchJson(url);
+
+                // Group model-backed forecast by day
+                const futureData = mapForecastResponseToDays(apiData);
                 
                 // Clear container
                 containerEl.innerHTML = '';
@@ -1319,24 +1320,66 @@
                 
             } catch (error) {
                 console.error('Failed to load future data:', error);
-                document.getElementById('future-error-message').textContent = 'Failed to load forecast data. Using mock data for demonstration.';
-                
-                // Fall back to mock data
-                try {
-                    const futureData = generateMockFutureData();
-                    containerEl.innerHTML = '';
-                    futureData.forEach(day => {
-                        const dayCard = createDayCard(day);
-                        containerEl.appendChild(dayCard);
-                    });
-                    window.futureDataLoaded = true;
-                    loadingEl.classList.add('hidden');
-                    dataEl.classList.remove('hidden');
-                } catch (e) {
-                    loadingEl.classList.add('hidden');
-                    errorEl.classList.remove('hidden');
-                }
+                document.getElementById('future-error-message').textContent = `Failed to load forecast data: ${error.message}`;
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
             }
+        }
+
+        /**
+         * Map /risk/forecast API payload into daily average cards for Future UI.
+         */
+        function mapForecastResponseToDays(apiData) {
+            const weatherRows = Array.isArray(apiData.weather_data) ? apiData.weather_data : [];
+            const fireRiskRows = Array.isArray(apiData.fire_risk) ? apiData.fire_risk : [];
+
+            if (!weatherRows.length || !fireRiskRows.length) {
+                return [];
+            }
+
+            const ttfByTimestamp = new Map(
+                fireRiskRows.map((row) => [row.timestamp, row.ttf])
+            );
+
+            const grouped = new Map();
+
+            weatherRows.forEach((weather) => {
+                const timestamp = weather.timestamp;
+                const ttf = ttfByTimestamp.get(timestamp);
+
+                if (ttf === undefined || timestamp === undefined) {
+                    return;
+                }
+
+                const dayKey = timestamp.slice(0, 10);
+                if (!grouped.has(dayKey)) {
+                    grouped.set(dayKey, []);
+                }
+
+                grouped.get(dayKey).push({
+                    temperature: weather.temperature,
+                    humidity: weather.humidity,
+                    wind_speed: weather.wind_speed,
+                    ttf,
+                });
+            });
+
+            return Array.from(grouped.entries())
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([date, entries]) => {
+                    const avgTemp = entries.reduce((sum, e) => sum + e.temperature, 0) / entries.length;
+                    const avgHumidity = entries.reduce((sum, e) => sum + e.humidity, 0) / entries.length;
+                    const avgWindSpeed = entries.reduce((sum, e) => sum + e.wind_speed, 0) / entries.length;
+                    const avgTTF = entries.reduce((sum, e) => sum + e.ttf, 0) / entries.length;
+
+                    return {
+                        date: new Date(`${date}T12:00:00Z`),
+                        temperature: avgTemp,
+                        humidity: avgHumidity,
+                        windSpeed: avgWindSpeed,
+                        ttf: avgTTF,
+                    };
+                });
         }
 
         /**

@@ -165,6 +165,7 @@ async def api_info():
             "/health": "Health check",
             "/locations/search": "Search locations from MET/Yr (GET)",
             "/risk/current": "Get current fire risk TTF from backend model (GET)",
+            "/risk/forecast": "Get forecast fire risk TTF series from backend model (GET)",
             "/calculate": "Calculate fire risk (POST) - requires authentication",
             "/historical": "Get historical weather data and fire risk (GET)",
             "/historical/stored": "Get database-stored historical data grouped by day (GET)",
@@ -248,6 +249,84 @@ async def get_current_risk(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to fetch current risk data: {str(e)}",
+        )
+
+
+@app.get("/risk/forecast")
+async def get_forecast_risk(
+    latitude: float = Query(..., description="Latitude coordinate", ge=-90, le=90),
+    longitude: float = Query(..., description="Longitude coordinate", ge=-180, le=180),
+    days: int = Query(7, description="Number of forecast days", ge=1, le=10),
+):
+    """Get forecast weather and TTF series using backend weather preprocessing and model."""
+    try:
+        from frcm.met_integration.client import METClient
+        from frcm.met_integration.transform import transform_met_to_weather_data
+
+        with METClient() as met_client:
+            met_response = met_client.fetch_weather_data(latitude=latitude, longitude=longitude)
+
+        weather_data = transform_met_to_weather_data(met_response)
+        fire_risk_prediction = compute(weather_data)
+
+        if not fire_risk_prediction.firerisks:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No forecast fire risk data available for this location",
+            )
+
+        cutoff = datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=days)
+
+        weather_payload = []
+        fire_risk_payload = []
+
+        for point, risk in zip(weather_data.data, fire_risk_prediction.firerisks):
+            point_time = point.timestamp
+            if point_time.tzinfo is None:
+                point_time = point_time.replace(tzinfo=datetime.timezone.utc)
+            if point_time > cutoff:
+                continue
+
+            weather_payload.append(
+                {
+                    "timestamp": point_time.isoformat(),
+                    "temperature": point.temperature,
+                    "humidity": point.humidity,
+                    "wind_speed": point.wind_speed,
+                }
+            )
+            fire_risk_payload.append(
+                {
+                    "timestamp": point_time.isoformat(),
+                    "ttf": risk.ttf,
+                }
+            )
+
+        return {
+            "latitude": latitude,
+            "longitude": longitude,
+            "days": days,
+            "weather_data": weather_payload,
+            "fire_risk": fire_risk_payload,
+            "model": "frcm-backend",
+        }
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    except HTTPException:
+        raise
+    except requests.exceptions.RequestException as e:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Unable to fetch weather data for forecast risk: {str(e)}",
+        )
+    except Exception as e:
+        logger.error(f"Error fetching forecast risk data: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch forecast risk data: {str(e)}",
         )
 
 
