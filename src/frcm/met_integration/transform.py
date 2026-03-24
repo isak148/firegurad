@@ -156,42 +156,45 @@ def transform_frost_to_weather_data(frost_response: Dict[str, Any]) -> WeatherDa
         
         logger.info(f"Processing {len(data_array)} observations from Frost API response")
         
-        weather_data_points: List[WeatherDataPoint] = []
-        
+        # Frost can return the required elements split across multiple entries
+        # (same referenceTime, different element/source). Merge by timestamp first.
+        merged_by_time: Dict[str, Dict[str, float]] = {}
+
         for entry in data_array:
             try:
-                # Extract timestamp
                 time_str = entry['referenceTime']
-                timestamp = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
-                
-                # Extract observations and organize by element
                 observations = entry.get('observations', [])
-                values = {}
-                
+
+                bucket = merged_by_time.setdefault(time_str, {})
                 for obs in observations:
                     element_id = obs.get('elementId', '')
                     value = obs.get('value')
                     if value is not None:
-                        values[element_id] = float(value)
-                
-                # Check if we have all required values
-                required_elements = {'air_temperature', 'relative_humidity', 'wind_speed'}
-                if not required_elements.issubset(values.keys()):
-                    logger.warning(f"Skipping observation at {time_str}: missing required elements")
-                    continue
-                
-                # Create WeatherDataPoint
+                        bucket[element_id] = float(value)
+            except (KeyError, ValueError, TypeError) as e:
+                logger.warning(f"Skipping observation due to error: {e}")
+                continue
+
+        weather_data_points: List[WeatherDataPoint] = []
+        required_elements = {'air_temperature', 'relative_humidity', 'wind_speed'}
+
+        for time_str in sorted(merged_by_time.keys()):
+            values = merged_by_time[time_str]
+            if not required_elements.issubset(values.keys()):
+                logger.warning(f"Skipping observation at {time_str}: missing required elements")
+                continue
+
+            try:
+                timestamp = datetime.datetime.fromisoformat(time_str.replace('Z', '+00:00'))
                 data_point = WeatherDataPoint(
                     timestamp=timestamp,
                     temperature=values['air_temperature'],
                     humidity=values['relative_humidity'],
                     wind_speed=values['wind_speed']
                 )
-                
                 weather_data_points.append(data_point)
-                
-            except (KeyError, ValueError, TypeError) as e:
-                logger.warning(f"Skipping observation due to error: {e}")
+            except (ValueError, TypeError) as e:
+                logger.warning(f"Skipping merged observation at {time_str} due to error: {e}")
                 continue
         
         if not weather_data_points:
