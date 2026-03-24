@@ -3,18 +3,14 @@ services:
     build: .
     container_name: frcm-api
     ports:
-      - "8443:8443"
+      - "8000:8000"
     environment:
       - FRCM_HOST=0.0.0.0
-      - FRCM_PORT=8443
-      - FRCM_SSL_CERT=/app/ssl/cert.pem
-      - FRCM_SSL_KEY=/app/ssl/key.pem
-      - FRCM_REQUIRE_HTTPS=True
+      - FRCM_PORT=8000
+      - FRCM_REQUIRE_HTTPS=False
     env_file:
       - .env
     volumes:
-      # Mount SSL certificates directory
-      - ./ssl:/app/ssl
       # Mount cache database for persistence
       - ./data:/app/data
     restart: unless-stopped
