@@ -13,6 +13,19 @@ from datetime import datetime, timedelta
 logger = logging.getLogger(__name__)
 
 
+class FrostAPIError(Exception):
+    """Structured Frost API error with status/message/reason fields."""
+
+    def __init__(self, status_code: int, message: str, reason: str = ""):
+        self.status_code = status_code
+        self.message = message
+        self.reason = reason
+        detail = f"Frost API returned status code {status_code}. Message: {message}"
+        if reason:
+            detail = f"{detail}. Reason: {reason}"
+        super().__init__(detail)
+
+
 class FrostClient:
     """
     Client for interacting with the MET Frost API.
@@ -105,6 +118,40 @@ class FrostClient:
             "data": merged_data,
         }
 
+    def _request_frost_json(
+        self,
+        endpoint: str,
+        parameters: Dict[str, Any],
+        timeout: int = 30,
+    ) -> Dict[str, Any]:
+        """
+        Request Frost endpoint using explicit endpoint/parameter style from MET examples.
+
+        Equivalent to:
+            r = requests.get(endpoint, parameters, auth=(client_id, ''))
+            json = r.json()
+            if r.status_code != 200: parse json['error']['message'/'reason']
+        """
+        response = self.session.get(
+            endpoint,
+            params=parameters,
+            auth=(self.client_id, ''),
+            timeout=timeout,
+        )
+
+        try:
+            payload = response.json()
+        except ValueError:
+            payload = {}
+
+        if response.status_code == 200:
+            return payload
+
+        error_obj = payload.get('error', {}) if isinstance(payload, dict) else {}
+        message = error_obj.get('message') or response.reason or 'Unknown error'
+        reason = error_obj.get('reason') or ''
+        raise FrostAPIError(status_code=response.status_code, message=message, reason=reason)
+
     def _fetch_observations_for_element(
         self,
         latitude: float,
@@ -133,35 +180,29 @@ class FrostClient:
                     params['timeresolutions'] = 'PT1H'
 
                 try:
-                    response = self.session.get(self.BASE_URL, params=params, timeout=30)
-                    response.raise_for_status()
+                    payload = self._request_frost_json(self.BASE_URL, params)
                     logger.info(
                         f"Fetched element={element} from source={source_id} "
-                        f"(hourly={use_hourly_resolution}). Status code: {response.status_code}"
+                        f"(hourly={use_hourly_resolution}). Status code: 200"
                     )
-                    return response.json()
+                    return payload
                 except requests.exceptions.Timeout:
                     logger.error("Request to Frost API timed out")
                     raise
-                except requests.exceptions.HTTPError as e:
-                    response_text = self._extract_response_text(e)
-                    status_code = e.response.status_code if e.response is not None else None
-
-                    if status_code == 401:
+                except FrostAPIError as e:
+                    if e.status_code == 401:
                         raise ValueError("Invalid Frost API client ID. Get one at https://frost.met.no/auth/requestCredentials.html")
 
                     # 412 means this source/parameter combination has no matching series.
-                    if status_code == 412:
-                        last_error_detail = response_text or str(e)
+                    if e.status_code == 412:
+                        last_error_detail = str(e)
                         logger.warning(
                             f"No timeseries for element={element}, source={source_id}, "
                             f"hourly={use_hourly_resolution}. Trying fallback."
                         )
                         continue
 
-                    if response_text:
-                        raise ValueError(f"Frost API error: {response_text}")
-                    raise
+                    raise ValueError(str(e))
                 except requests.exceptions.RequestException as e:
                     logger.error(f"Error fetching data from Frost API: {e}")
                     raise
@@ -188,23 +229,13 @@ class FrostClient:
             params['elements'] = element
 
         try:
-            response = self.session.get(self.SOURCES_URL, params=params, timeout=30)
-            response.raise_for_status()
-            payload = response.json()
+            payload = self._request_frost_json(self.SOURCES_URL, params)
         except requests.exceptions.Timeout:
             logger.error("Request to Frost sources API timed out")
             raise
-        except requests.exceptions.HTTPError as e:
-            response_text = ""
-            if hasattr(e, 'response') and e.response is not None:
-                try:
-                    response_text = e.response.text
-                except Exception:
-                    response_text = ""
-            logger.error(f"HTTP error from Frost sources API: {e}. Response body: {response_text}")
-            if response_text:
-                raise ValueError(f"Frost sources API error: {response_text}")
-            raise
+        except FrostAPIError as e:
+            logger.error(f"HTTP error from Frost sources API: {e}")
+            raise ValueError(str(e))
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching data from Frost sources API: {e}")
             raise
@@ -237,9 +268,7 @@ class FrostClient:
         }
 
         try:
-            response = self.session.get(self.AVAILABLE_TS_URL, params=params, timeout=30)
-            response.raise_for_status()
-            payload = response.json()
+            payload = self._request_frost_json(self.AVAILABLE_TS_URL, params)
             for row in payload.get('data', []):
                 source_id = row.get('sourceId') or row.get('source') or row.get('id')
                 if not source_id:
@@ -249,21 +278,12 @@ class FrostClient:
                     candidate_ids.append(source_id)
             if candidate_ids:
                 return candidate_ids[:10]
-        except requests.exceptions.RequestException as e:
+        except (requests.exceptions.RequestException, FrostAPIError) as e:
             logger.warning(f"availableTimeSeries lookup failed for element={element}: {e}")
 
         # Fallback: at least try nearest source endpoint result.
         return [self._resolve_nearest_source_id(latitude=latitude, longitude=longitude, element=element)]
 
-    @staticmethod
-    def _extract_response_text(error: requests.exceptions.HTTPError) -> str:
-        if hasattr(error, 'response') and error.response is not None:
-            try:
-                return error.response.text
-            except Exception:
-                return ""
-        return ""
-    
     def close(self):
         """Close the session."""
         self.session.close()
