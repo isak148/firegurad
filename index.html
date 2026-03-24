@@ -518,6 +518,39 @@
         const BACKEND_API_CANDIDATES = buildBackendApiCandidates();
         let resolvedBackendApiEndpoint = null;
 
+        async function fetchJson(url, options = {}) {
+            const response = await fetch(url, options);
+            const contentType = response.headers.get('content-type') || '';
+
+            if (!response.ok) {
+                let errorDetail = response.statusText || `HTTP ${response.status}`;
+                try {
+                    if (contentType.includes('application/json')) {
+                        const errorPayload = await response.json();
+                        errorDetail = errorPayload.detail || errorDetail;
+                    } else {
+                        const textPayload = await response.text();
+                        if (textPayload) {
+                            errorDetail = textPayload.slice(0, 120);
+                        }
+                    }
+                } catch (_) {
+                    // Keep fallback error detail.
+                }
+                throw new Error(errorDetail);
+            }
+
+            if (!contentType.includes('application/json')) {
+                throw new Error('Expected JSON response but got non-JSON content. Check backend API routing and base URL.');
+            }
+
+            try {
+                return await response.json();
+            } catch (_) {
+                throw new Error('Received invalid JSON response from backend API.');
+            }
+        }
+
         async function resolveBackendApiEndpoint() {
             if (resolvedBackendApiEndpoint) {
                 return resolvedBackendApiEndpoint;
@@ -527,8 +560,8 @@
 
             for (const candidate of BACKEND_API_CANDIDATES) {
                 try {
-                    const response = await fetch(`${candidate}/health`, { method: 'GET' });
-                    if (response.ok) {
+                    const health = await fetchJson(`${candidate}/health`, { method: 'GET' });
+                    if (health && health.status === 'healthy') {
                         resolvedBackendApiEndpoint = candidate;
                         return candidate;
                     }
@@ -654,20 +687,7 @@
 
         async function searchLocations(query) {
             const backendApi = await resolveBackendApiEndpoint();
-            const response = await fetch(`${backendApi}/locations/search?q=${encodeURIComponent(query)}&limit=8`);
-
-            if (!response.ok) {
-                let detail = response.statusText;
-                try {
-                    const errorPayload = await response.json();
-                    detail = errorPayload.detail || detail;
-                } catch (_) {
-                    // Keep default status text when JSON payload is unavailable.
-                }
-                throw new Error(detail || `HTTP ${response.status}`);
-            }
-
-            const payload = await response.json();
+            const payload = await fetchJson(`${backendApi}/locations/search?q=${encodeURIComponent(query)}&limit=8`);
             return payload.locations || [];
         }
 
@@ -1067,13 +1087,8 @@
                 console.log('Fetching stored historical data from backend API...');
                 const backendApi = await resolveBackendApiEndpoint();
                 const url = `${backendApi}/historical/stored?days=7`;
-                
-                const response = await fetch(url);
-                if (!response.ok) {
-                    throw new Error(`API returned status ${response.status}: ${response.statusText}`);
-                }
-                
-                const apiData = await response.json();
+
+                const apiData = await fetchJson(url);
                 console.log('Received historical data:', apiData);
                 
                 // Clear container
