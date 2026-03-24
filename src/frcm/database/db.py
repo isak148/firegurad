@@ -2,14 +2,18 @@
 import sqlite3
 import json
 import hashlib
+import secrets
+import hmac
 from pathlib import Path
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import frcm.datamodel.model as dm
 
 
 class Database:
     """Database for caching weather data and fire risk predictions."""
+
+    PASSWORD_HASH_ITERATIONS = 200_000
     
     def __init__(self, db_path: str = "frcm_cache.db"):
         """Initialize database connection.
@@ -61,6 +65,30 @@ class Database:
             )
         """)
 
+        # Table for user accounts
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                password_hash TEXT NOT NULL,
+                password_salt TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            )
+        """)
+
+        # Table for simple bearer sessions
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_sessions (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                token TEXT UNIQUE NOT NULL,
+                expires_at TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
         # Create index for faster lookups
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_weather_hash 
@@ -75,6 +103,16 @@ class Database:
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_historical_location_time
             ON historical_weather_data(location_name, fetched_at)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_users_email
+            ON users(email)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_sessions_token
+            ON user_sessions(token)
         """)
         
         self.conn.commit()
@@ -250,6 +288,120 @@ class Database:
         if self.conn:
             self.conn.close()
             self.conn = None
+
+    @staticmethod
+    def _hash_password(password: str, salt: str) -> str:
+        """Hash password using PBKDF2-HMAC-SHA256."""
+        password_bytes = password.encode("utf-8")
+        salt_bytes = salt.encode("utf-8")
+        digest = hashlib.pbkdf2_hmac(
+            "sha256",
+            password_bytes,
+            salt_bytes,
+            Database.PASSWORD_HASH_ITERATIONS,
+        )
+        return digest.hex()
+
+    def create_user(self, name: str, email: str, password: str) -> dict:
+        """Create a new user account."""
+        created_at = datetime.now(timezone.utc).isoformat()
+        normalized_email = email.strip().lower()
+        salt = secrets.token_hex(16)
+        password_hash = self._hash_password(password, salt)
+
+        cursor = self.conn.cursor()
+        try:
+            cursor.execute(
+                """
+                INSERT INTO users (name, email, password_hash, password_salt, created_at)
+                VALUES (?, ?, ?, ?, ?)
+                """,
+                (name.strip(), normalized_email, password_hash, salt, created_at),
+            )
+            self.conn.commit()
+        except sqlite3.IntegrityError as e:
+            if "users.email" in str(e):
+                raise ValueError("A user with this email already exists")
+            raise
+
+        user_id = cursor.lastrowid
+        return {
+            "id": user_id,
+            "name": name.strip(),
+            "email": normalized_email,
+            "created_at": created_at,
+        }
+
+    def verify_user_credentials(self, email: str, password: str) -> Optional[dict]:
+        """Verify login credentials and return user on success."""
+        normalized_email = email.strip().lower()
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT id, name, email, password_hash, password_salt, created_at
+            FROM users
+            WHERE email = ?
+            """,
+            (normalized_email,),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        user_id, name, user_email, stored_hash, salt, created_at = row
+        computed_hash = self._hash_password(password, salt)
+        if not hmac.compare_digest(stored_hash, computed_hash):
+            return None
+
+        return {
+            "id": user_id,
+            "name": name,
+            "email": user_email,
+            "created_at": created_at,
+        }
+
+    def create_user_session(self, user_id: int, expires_hours: int = 24) -> str:
+        """Create bearer session token for a user."""
+        token = secrets.token_urlsafe(32)
+        created_at = datetime.now(timezone.utc)
+        expires_at = created_at + timedelta(hours=expires_hours)
+
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO user_sessions (user_id, token, expires_at, created_at)
+            VALUES (?, ?, ?, ?)
+            """,
+            (user_id, token, expires_at.isoformat(), created_at.isoformat()),
+        )
+        self.conn.commit()
+        return token
+
+    def get_user_by_session_token(self, token: str) -> Optional[dict]:
+        """Return user info for valid (non-expired) session token."""
+        now = datetime.now(timezone.utc).isoformat()
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT u.id, u.name, u.email, u.created_at
+            FROM user_sessions s
+            JOIN users u ON u.id = s.user_id
+            WHERE s.token = ? AND s.expires_at > ?
+            LIMIT 1
+            """,
+            (token, now),
+        )
+        row = cursor.fetchone()
+        if not row:
+            return None
+
+        user_id, name, email, created_at = row
+        return {
+            "id": user_id,
+            "name": name,
+            "email": email,
+            "created_at": created_at,
+        }
 
 
 # Global database instance

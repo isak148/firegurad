@@ -2,11 +2,13 @@
 from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from typing import List, Optional
 import datetime
 import os
 import logging
 import requests
+from pydantic import BaseModel, Field
 
 from frcm.datamodel.model import WeatherDataPoint, WeatherData, FireRiskPrediction
 from frcm.fireriskmodel.compute import compute
@@ -15,6 +17,56 @@ from .auth import verify_api_key
 from .config import settings
 
 logger = logging.getLogger(__name__)
+bearer_auth = HTTPBearer(auto_error=False)
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=100)
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+class LoginRequest(BaseModel):
+    email: str = Field(..., min_length=3, max_length=255)
+    password: str = Field(..., min_length=8, max_length=128)
+
+
+def _is_valid_email(email: str) -> bool:
+    """Basic email validation without external dependency."""
+    if "@" not in email:
+        return False
+    local, _, domain = email.partition("@")
+    return bool(local and domain and "." in domain)
+
+
+def _get_database() -> Database:
+    db_path = os.environ.get("FRCM_DATABASE_PATH", "frcm_cache.db")
+    return Database(db_path)
+
+
+async def get_authenticated_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_auth),
+) -> dict:
+    """Resolve authenticated user from bearer session token."""
+    if credentials is None or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing bearer token",
+        )
+
+    db = _get_database()
+    try:
+        user = db.get_user_by_session_token(credentials.credentials)
+    finally:
+        db.close()
+
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired session token",
+        )
+
+    return user
 
 app = FastAPI(
     title="FRCM Fire Risk Calculation API",
@@ -50,6 +102,77 @@ async def root():
 async def health():
     """Health check endpoint."""
     return {"status": "healthy"}
+
+
+@app.post("/auth/register")
+async def register_user(payload: RegisterRequest):
+    """Create a user account with name, email and password."""
+    if not _is_valid_email(payload.email):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid email format",
+        )
+
+    db = _get_database()
+    try:
+        user = db.create_user(payload.name, payload.email, payload.password)
+        token = db.create_user_session(user["id"])
+    except ValueError as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e),
+        )
+    finally:
+        db.close()
+
+    return {
+        "user": {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"],
+            "created_at": user["created_at"],
+        },
+        "token": token,
+        "token_type": "Bearer",
+    }
+
+
+@app.post("/auth/login")
+async def login_user(payload: LoginRequest):
+    """Login with email and password and receive bearer token."""
+    db = _get_database()
+    try:
+        user = db.verify_user_credentials(payload.email, payload.password)
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid email or password",
+            )
+        token = db.create_user_session(user["id"])
+    finally:
+        db.close()
+
+    return {
+        "user": {
+            "id": user["id"],
+            "name": user["name"],
+            "email": user["email"],
+            "created_at": user["created_at"],
+        },
+        "token": token,
+        "token_type": "Bearer",
+    }
+
+
+@app.get("/auth/me")
+async def get_me(user: dict = Depends(get_authenticated_user)):
+    """Return profile of currently authenticated user."""
+    return {
+        "id": user["id"],
+        "name": user["name"],
+        "email": user["email"],
+        "created_at": user["created_at"],
+    }
 
 
 @app.get("/locations/search")
@@ -163,6 +286,9 @@ async def api_info():
         "endpoints": {
             "/": "API information",
             "/health": "Health check",
+            "/auth/register": "Create user account with name/email/password (POST)",
+            "/auth/login": "Login and receive bearer session token (POST)",
+            "/auth/me": "Get current authenticated user profile (GET)",
             "/locations/search": "Search locations from MET/Yr (GET)",
             "/risk/current": "Get current fire risk TTF from backend model (GET)",
             "/risk/forecast": "Get forecast fire risk TTF series from backend model (GET)",
