@@ -479,6 +479,9 @@
                 candidates.push(normalized);
             };
 
+            // When the page is served by nginx, same-origin /api is the most reliable route.
+            addCandidate('/api');
+
             const addBaseWithApiVariant = (baseUrl) => {
                 const normalized = normalizeBaseUrl(baseUrl);
                 if (!normalized) return;
