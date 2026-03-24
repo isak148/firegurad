@@ -23,6 +23,7 @@ class FrostClient:
     
     BASE_URL = "https://frost.met.no/observations/v0.jsonld"
     SOURCES_URL = "https://frost.met.no/sources/v0.jsonld"
+    AVAILABLE_TS_URL = "https://frost.met.no/observations/availableTimeSeries/v0.jsonld"
     
     def __init__(self, client_id: str, user_agent: str = "firegurad/0.1.0 github.com/isak148/firegurad"):
         """
@@ -112,47 +113,63 @@ class FrostClient:
         end_str: str,
         element: str,
     ) -> Dict[str, Any]:
-        source_id = self._resolve_nearest_source_id(
+        candidate_sources = self._resolve_candidate_source_ids(
             latitude=latitude,
             longitude=longitude,
+            start_str=start_str,
+            end_str=end_str,
             element=element,
         )
 
-        params = {
-            'referencetime': f'{start_str}/{end_str}',
-            'elements': element,
-            'sources': source_id,
-            'timeresolutions': 'PT1H',
-        }
+        last_error_detail = ""
+        for source_id in candidate_sources:
+            for use_hourly_resolution in (True, False):
+                params = {
+                    'referencetime': f'{start_str}/{end_str}',
+                    'elements': element,
+                    'sources': source_id,
+                }
+                if use_hourly_resolution:
+                    params['timeresolutions'] = 'PT1H'
 
-        try:
-            response = self.session.get(self.BASE_URL, params=params, timeout=30)
-            response.raise_for_status()
-            logger.info(
-                f"Fetched element={element} from source={source_id}. "
-                f"Status code: {response.status_code}"
-            )
-            return response.json()
-        except requests.exceptions.Timeout:
-            logger.error("Request to Frost API timed out")
-            raise
-        except requests.exceptions.HTTPError as e:
-            response_text = ""
-            if hasattr(e, 'response') and e.response is not None:
                 try:
-                    response_text = e.response.text
-                except Exception:
-                    response_text = ""
+                    response = self.session.get(self.BASE_URL, params=params, timeout=30)
+                    response.raise_for_status()
+                    logger.info(
+                        f"Fetched element={element} from source={source_id} "
+                        f"(hourly={use_hourly_resolution}). Status code: {response.status_code}"
+                    )
+                    return response.json()
+                except requests.exceptions.Timeout:
+                    logger.error("Request to Frost API timed out")
+                    raise
+                except requests.exceptions.HTTPError as e:
+                    response_text = self._extract_response_text(e)
+                    status_code = e.response.status_code if e.response is not None else None
 
-            logger.error(f"HTTP error from Frost API: {e}. Response body: {response_text}")
-            if hasattr(e, 'response') and e.response is not None and e.response.status_code == 401:
-                raise ValueError("Invalid Frost API client ID. Get one at https://frost.met.no/auth/requestCredentials.html")
-            if response_text:
-                raise ValueError(f"Frost API error: {response_text}")
-            raise
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching data from Frost API: {e}")
-            raise
+                    if status_code == 401:
+                        raise ValueError("Invalid Frost API client ID. Get one at https://frost.met.no/auth/requestCredentials.html")
+
+                    # 412 means this source/parameter combination has no matching series.
+                    if status_code == 412:
+                        last_error_detail = response_text or str(e)
+                        logger.warning(
+                            f"No timeseries for element={element}, source={source_id}, "
+                            f"hourly={use_hourly_resolution}. Trying fallback."
+                        )
+                        continue
+
+                    if response_text:
+                        raise ValueError(f"Frost API error: {response_text}")
+                    raise
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Error fetching data from Frost API: {e}")
+                    raise
+
+        detail = last_error_detail or (
+            f"No available Frost time series found for element={element} in requested time range"
+        )
+        raise ValueError(f"Frost API error: {detail}")
 
     def _resolve_nearest_source_id(self, latitude: float, longitude: float, element: Optional[str] = None) -> str:
         """Resolve nearest Frost station source ID for given coordinates."""
@@ -194,6 +211,51 @@ class FrostClient:
             raise ValueError("Nearest Frost source response did not include source id")
 
         return source_id
+
+    def _resolve_candidate_source_ids(
+        self,
+        latitude: float,
+        longitude: float,
+        start_str: str,
+        end_str: str,
+        element: str,
+    ) -> List[str]:
+        """Resolve candidate source IDs that likely have data for given element/time range."""
+        candidate_ids: List[str] = []
+
+        params = {
+            'referencetime': f'{start_str}/{end_str}',
+            'elements': element,
+            'geometry': f'nearest(POINT({longitude} {latitude}))',
+        }
+
+        try:
+            response = self.session.get(self.AVAILABLE_TS_URL, params=params, timeout=30)
+            response.raise_for_status()
+            payload = response.json()
+            for row in payload.get('data', []):
+                source_id = row.get('sourceId') or row.get('source') or row.get('id')
+                if not source_id:
+                    continue
+                source_id = str(source_id).split(':')[0]
+                if source_id not in candidate_ids:
+                    candidate_ids.append(source_id)
+            if candidate_ids:
+                return candidate_ids[:10]
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"availableTimeSeries lookup failed for element={element}: {e}")
+
+        # Fallback: at least try nearest source endpoint result.
+        return [self._resolve_nearest_source_id(latitude=latitude, longitude=longitude, element=element)]
+
+    @staticmethod
+    def _extract_response_text(error: requests.exceptions.HTTPError) -> str:
+        if hasattr(error, 'response') and error.response is not None:
+            try:
+                return error.response.text
+            except Exception:
+                return ""
+        return ""
     
     def close(self):
         """Close the session."""
