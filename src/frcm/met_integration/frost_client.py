@@ -22,6 +22,7 @@ class FrostClient:
     """
     
     BASE_URL = "https://frost.met.no/observations/v0.jsonld"
+    SOURCES_URL = "https://frost.met.no/sources/v0.jsonld"
     
     def __init__(self, client_id: str, user_agent: str = "firegurad/0.1.0 github.com/isak148/firegurad"):
         """
@@ -85,12 +86,14 @@ class FrostClient:
         start_str = start_time.strftime('%Y-%m-%dT%H')
         end_str = end_time.strftime('%Y-%m-%dT%H')
         
+        source_id = self._resolve_nearest_source_id(latitude=latitude, longitude=longitude)
+
         # Prepare request parameters.
-        # Frost observations endpoint requires 'sources'. Use nearest station expression.
+        # Frost observations endpoint requires valid source IDs (e.g. SN18700).
         params = {
             'referencetime': f'{start_str}/{end_str}',
             'elements': ','.join(elements),
-            'sources': f'nearest(POINT({longitude} {latitude}))',
+            'sources': source_id,
             'timeresolutions': 'PT1H',  # Hourly data
         }
         
@@ -124,6 +127,45 @@ class FrostClient:
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching data from Frost API: {e}")
             raise
+
+    def _resolve_nearest_source_id(self, latitude: float, longitude: float) -> str:
+        """Resolve nearest Frost station source ID for given coordinates."""
+        params = {
+            'geometry': f'nearest(POINT({longitude} {latitude}))',
+            'types': 'SensorSystem',
+        }
+
+        try:
+            response = self.session.get(self.SOURCES_URL, params=params, timeout=30)
+            response.raise_for_status()
+            payload = response.json()
+        except requests.exceptions.Timeout:
+            logger.error("Request to Frost sources API timed out")
+            raise
+        except requests.exceptions.HTTPError as e:
+            response_text = ""
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    response_text = e.response.text
+                except Exception:
+                    response_text = ""
+            logger.error(f"HTTP error from Frost sources API: {e}. Response body: {response_text}")
+            if response_text:
+                raise ValueError(f"Frost sources API error: {response_text}")
+            raise
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching data from Frost sources API: {e}")
+            raise
+
+        sources = payload.get('data', [])
+        if not sources:
+            raise ValueError("No nearby Frost source found for this location")
+
+        source_id = sources[0].get('id')
+        if not source_id:
+            raise ValueError("Nearest Frost source response did not include source id")
+
+        return source_id
     
     def close(self):
         """Close the session."""
