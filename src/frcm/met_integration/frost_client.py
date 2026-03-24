@@ -86,27 +86,53 @@ class FrostClient:
         start_str = start_time.strftime('%Y-%m-%dT%H')
         end_str = end_time.strftime('%Y-%m-%dT%H')
         
-        source_id = self._resolve_nearest_source_id(latitude=latitude, longitude=longitude)
-
-        # Prepare request parameters.
-        # Frost observations endpoint requires valid source IDs (e.g. SN18700).
-        params = {
-            'referencetime': f'{start_str}/{end_str}',
-            'elements': ','.join(elements),
-            'sources': source_id,
-            'timeresolutions': 'PT1H',  # Hourly data
-        }
-        
         logger.info(f"Fetching historical weather data for coordinates: lat={latitude}, lon={longitude}")
         logger.info(f"Time range: {start_str} to {end_str}")
-        
+
+        merged_data: List[Dict[str, Any]] = []
+        for element in elements:
+            element_payload = self._fetch_observations_for_element(
+                latitude=latitude,
+                longitude=longitude,
+                start_str=start_str,
+                end_str=end_str,
+                element=element,
+            )
+            merged_data.extend(element_payload.get('data', []))
+
+        return {
+            "data": merged_data,
+        }
+
+    def _fetch_observations_for_element(
+        self,
+        latitude: float,
+        longitude: float,
+        start_str: str,
+        end_str: str,
+        element: str,
+    ) -> Dict[str, Any]:
+        source_id = self._resolve_nearest_source_id(
+            latitude=latitude,
+            longitude=longitude,
+            element=element,
+        )
+
+        params = {
+            'referencetime': f'{start_str}/{end_str}',
+            'elements': element,
+            'sources': source_id,
+            'timeresolutions': 'PT1H',
+        }
+
         try:
             response = self.session.get(self.BASE_URL, params=params, timeout=30)
             response.raise_for_status()
-            
-            logger.info(f"Successfully fetched historical data. Status code: {response.status_code}")
+            logger.info(
+                f"Fetched element={element} from source={source_id}. "
+                f"Status code: {response.status_code}"
+            )
             return response.json()
-            
         except requests.exceptions.Timeout:
             logger.error("Request to Frost API timed out")
             raise
@@ -128,12 +154,14 @@ class FrostClient:
             logger.error(f"Error fetching data from Frost API: {e}")
             raise
 
-    def _resolve_nearest_source_id(self, latitude: float, longitude: float) -> str:
+    def _resolve_nearest_source_id(self, latitude: float, longitude: float, element: Optional[str] = None) -> str:
         """Resolve nearest Frost station source ID for given coordinates."""
         params = {
             'geometry': f'nearest(POINT({longitude} {latitude}))',
             'types': 'SensorSystem',
         }
+        if element:
+            params['elements'] = element
 
         try:
             response = self.session.get(self.SOURCES_URL, params=params, timeout=30)
