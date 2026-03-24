@@ -1083,26 +1083,28 @@
                 errorEl.classList.add('hidden');
                 dataEl.classList.add('hidden');
                 
-                // Fetch stored historical data from backend database API
-                console.log('Fetching stored historical data from backend API...');
+                // Fetch historical observations from MET via backend API
+                console.log('Fetching historical data from MET backend API...');
                 const backendApi = await resolveBackendApiEndpoint();
-                const url = `${backendApi}/historical/stored?days=7`;
+                const url = `${backendApi}/historical?latitude=${encodeURIComponent(currentLocation.latitude)}&longitude=${encodeURIComponent(currentLocation.longitude)}&days=7`;
 
                 const apiData = await fetchJson(url);
                 console.log('Received historical data:', apiData);
+
+                const groupedDays = mapHistoricalResponseToDays(apiData);
                 
                 // Clear container
                 containerEl.innerHTML = '';
                 
-                if (!apiData.days || apiData.days.length === 0) {
+                if (!groupedDays.length) {
                     containerEl.innerHTML = `
                         <div class="bg-slate-50 border border-slate-200 rounded-xl p-6 text-center text-slate-600">
-                            No stored historical data found yet. Start the scheduled harvester to collect historical entries.
+                            No historical observations were returned for this location.
                         </div>
                     `;
                 } else {
                     // Display full day-by-day data with all entries
-                    apiData.days.forEach(day => {
+                    groupedDays.forEach(day => {
                         const dayCard = createHistoricDayCard(day);
                         containerEl.appendChild(dayCard);
                     });
@@ -1119,7 +1121,9 @@
                 
                 // Show user-friendly error message
                 let errorMessage = 'Failed to load historic data. ';
-                if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('Could not resolve backend API endpoint')) {
+                if (error.message.includes('FRCM_FROST_CLIENT_ID')) {
+                    errorMessage += 'Historical data from MET requires FRCM_FROST_CLIENT_ID in backend environment.';
+                } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError') || error.message.includes('Could not resolve backend API endpoint')) {
                     errorMessage += 'Could not connect to backend API. Open this page via http://158.37.66.156 (not file://), or set ?backend=http://158.37.66.156/api.';
                 } else {
                     errorMessage += error.message;
@@ -1129,6 +1133,53 @@
                 loadingEl.classList.add('hidden');
                 errorEl.classList.remove('hidden');
             }
+        }
+
+        /**
+         * Map /historical API payload into day-grouped rows for existing historic table UI.
+         */
+        function mapHistoricalResponseToDays(apiData) {
+            const weatherRows = Array.isArray(apiData.weather_data) ? apiData.weather_data : [];
+            const fireRiskRows = Array.isArray(apiData.fire_risk) ? apiData.fire_risk : [];
+
+            if (!weatherRows.length || !fireRiskRows.length) {
+                return [];
+            }
+
+            const ttfByTimestamp = new Map(
+                fireRiskRows.map((row) => [row.timestamp, row.ttf])
+            );
+
+            const grouped = new Map();
+
+            weatherRows.forEach((weather) => {
+                const timestamp = weather.timestamp;
+                const ttf = ttfByTimestamp.get(timestamp);
+
+                if (ttf === undefined || timestamp === undefined) {
+                    return;
+                }
+
+                const dayKey = timestamp.slice(0, 10);
+                if (!grouped.has(dayKey)) {
+                    grouped.set(dayKey, []);
+                }
+
+                grouped.get(dayKey).push({
+                    timestamp,
+                    temperature: weather.temperature,
+                    humidity: weather.humidity,
+                    wind_speed: weather.wind_speed,
+                    ttf,
+                });
+            });
+
+            return Array.from(grouped.entries())
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([date, entries]) => ({
+                    date,
+                    entries: entries.sort((a, b) => a.timestamp.localeCompare(b.timestamp)),
+                }));
         }
 
         /**
