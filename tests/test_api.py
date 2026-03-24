@@ -6,6 +6,7 @@ import datetime
 
 from frcm.api.app import app
 from frcm.datamodel.model import WeatherDataPoint, WeatherData, FireRisk, FireRiskPrediction
+from frcm.database import Database
 
 
 @pytest.fixture
@@ -46,6 +47,33 @@ class TestPublicEndpoints:
         response = client.get("/health")
         assert response.status_code == 200
         assert response.json() == {"status": "healthy"}
+
+    def test_register_persists_user_in_database(self, tmp_path, monkeypatch):
+        """Test that user registration writes user data to backend database."""
+        db_path = tmp_path / "test_users.db"
+        monkeypatch.setenv("FRCM_DATABASE_PATH", str(db_path))
+
+        with TestClient(app) as client:
+            register_response = client.post(
+                "/auth/register",
+                json={
+                    "name": "Test User",
+                    "email": "test.user@example.com",
+                    "password": "password123",
+                },
+            )
+
+        assert register_response.status_code == 200
+
+        db = Database(str(db_path))
+        try:
+            user = db.verify_user_credentials("test.user@example.com", "password123")
+        finally:
+            db.close()
+
+        assert user is not None
+        assert user["name"] == "Test User"
+        assert user["email"] == "test.user@example.com"
     
     def test_api_info_endpoint(self, client):
         """Test API info endpoint."""
