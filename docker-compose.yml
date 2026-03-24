@@ -1,7 +1,6 @@
 services:
   frcm-api:
     build: .
-    container_name: frcm-api
     ports:
       - "8000:8000"
     environment:
@@ -21,7 +20,6 @@ services:
   # Optional: MQTT broker for notifications
   mqtt-broker:
     image: eclipse-mosquitto:latest
-    container_name: frcm-mqtt
     ports:
       - "1883:1883"
       - "9001:9001"
@@ -38,7 +36,6 @@ services:
   # Web frontend service
   web:
     image: nginx:alpine
-    container_name: fireguard-web
     ports:
       - "80:80"
     volumes:
