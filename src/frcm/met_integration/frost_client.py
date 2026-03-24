@@ -85,12 +85,12 @@ class FrostClient:
         start_str = start_time.strftime('%Y-%m-%dT%H')
         end_str = end_time.strftime('%Y-%m-%dT%H')
         
-        # Prepare request parameters
-        # Frost API uses nearest station to the given coordinates
+        # Prepare request parameters.
+        # Frost observations endpoint requires 'sources'. Use nearest station expression.
         params = {
             'referencetime': f'{start_str}/{end_str}',
             'elements': ','.join(elements),
-            'geometry': f'nearest(POINT({longitude} {latitude}))',
+            'sources': f'nearest(POINT({longitude} {latitude}))',
             'timeresolutions': 'PT1H',  # Hourly data
         }
         
