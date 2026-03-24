@@ -139,6 +139,55 @@ class TestPublicEndpoints:
         assert payload["days"] == []
 
 
+class TestUserFavorites:
+    """Test authenticated favorite locations endpoints."""
+
+    def test_user_favorites_crud(self, tmp_path, monkeypatch):
+        """Register user and verify favorite locations are persisted in backend DB."""
+        db_path = tmp_path / "test_favorites.db"
+        monkeypatch.setenv("FRCM_DATABASE_PATH", str(db_path))
+
+        with TestClient(app) as client:
+            register_response = client.post(
+                "/auth/register",
+                json={
+                    "name": "Favorite User",
+                    "email": "favorites@example.com",
+                    "password": "password123",
+                },
+            )
+            assert register_response.status_code == 200
+            token = register_response.json()["token"]
+            auth_headers = {"Authorization": f"Bearer {token}"}
+
+            add_response = client.post(
+                "/favorites",
+                headers=auth_headers,
+                json={
+                    "name": "Bergen, Norway",
+                    "latitude": 60.3913,
+                    "longitude": 5.3221,
+                },
+            )
+            assert add_response.status_code == 200
+
+            get_response = client.get("/favorites", headers=auth_headers)
+            assert get_response.status_code == 200
+            favorites = get_response.json()["favorites"]
+            assert len(favorites) == 1
+            assert favorites[0]["name"] == "Bergen, Norway"
+
+            delete_response = client.delete(
+                "/favorites?location_key=60.3913%2C5.3221",
+                headers=auth_headers,
+            )
+            assert delete_response.status_code == 200
+
+            get_after_delete = client.get("/favorites", headers=auth_headers)
+            assert get_after_delete.status_code == 200
+            assert get_after_delete.json()["favorites"] == []
+
+
 class TestAuthenticationDisabled:
     """Test API behavior when authentication is disabled."""
     

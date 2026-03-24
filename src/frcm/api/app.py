@@ -32,6 +32,17 @@ class LoginRequest(BaseModel):
     password: str = Field(..., min_length=8, max_length=128)
 
 
+class FavoriteLocationRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    latitude: float
+    longitude: float
+
+
+def _location_key(latitude: float, longitude: float) -> str:
+    """Generate stable location key from coordinates."""
+    return f"{latitude:.4f},{longitude:.4f}"
+
+
 def _is_valid_email(email: str) -> bool:
     """Basic email validation without external dependency."""
     if "@" not in email:
@@ -188,6 +199,64 @@ async def get_me(user: dict = Depends(get_authenticated_user)):
         "email": user["email"],
         "created_at": user["created_at"],
     }
+
+
+@app.get("/favorites")
+async def get_user_favorites(user: dict = Depends(get_authenticated_user)):
+    """Return favorite locations for authenticated user."""
+    db = _get_database()
+    try:
+        favorites = db.get_user_favorite_locations(user["id"])
+    finally:
+        db.close()
+
+    return {"favorites": favorites}
+
+
+@app.post("/favorites")
+async def add_user_favorite(
+    payload: FavoriteLocationRequest,
+    user: dict = Depends(get_authenticated_user),
+):
+    """Create or update favorite location for authenticated user."""
+    latitude = float(payload.latitude)
+    longitude = float(payload.longitude)
+    if not (-90.0 <= latitude <= 90.0):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Latitude must be between -90 and 90")
+    if not (-180.0 <= longitude <= 180.0):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Longitude must be between -180 and 180")
+
+    db = _get_database()
+    try:
+        favorite = db.upsert_user_favorite_location(
+            user_id=user["id"],
+            location_key=_location_key(latitude, longitude),
+            name=payload.name,
+            latitude=latitude,
+            longitude=longitude,
+        )
+    finally:
+        db.close()
+
+    return {"favorite": favorite}
+
+
+@app.delete("/favorites")
+async def delete_user_favorite(
+    location_key: str = Query(..., min_length=3, max_length=64),
+    user: dict = Depends(get_authenticated_user),
+):
+    """Delete favorite location for authenticated user."""
+    db = _get_database()
+    try:
+        deleted = db.delete_user_favorite_location(user["id"], location_key)
+    finally:
+        db.close()
+
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Favorite not found")
+
+    return {"deleted": True, "location_key": location_key}
 
 
 @app.get("/locations/search")

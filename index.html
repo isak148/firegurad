@@ -694,6 +694,7 @@
             if (!token) {
                 currentUser = null;
                 updateAuthUi();
+                await refreshFavoritesForCurrentUser();
                 return;
             }
 
@@ -712,6 +713,10 @@
             }
 
             updateAuthUi();
+            if (currentUser) {
+                await migrateLocalFavoritesToBackend();
+            }
+            await refreshFavoritesForCurrentUser();
         }
 
         async function registerUser(name, email, password) {
@@ -795,6 +800,8 @@
                     setAuthToken(response.token || '');
                     currentUser = response.user || null;
                     updateAuthUi();
+                    await migrateLocalFavoritesToBackend();
+                    await refreshFavoritesForCurrentUser();
                     showAuthMessage('User registered and signed in successfully.');
                     registerForm.reset();
                     closeModal(registerModal);
@@ -815,6 +822,8 @@
                     setAuthToken(response.token || '');
                     currentUser = response.user || null;
                     updateAuthUi();
+                    await migrateLocalFavoritesToBackend();
+                    await refreshFavoritesForCurrentUser();
                     showAuthMessage('Signed in successfully.');
                     loginForm.reset();
                     closeModal(loginModal);
@@ -828,6 +837,7 @@
                 currentUser = null;
                 updateAuthUi();
                 showAuthMessage('Signed out successfully.');
+                refreshFavoritesForCurrentUser();
             });
 
             updateAuthUi();
@@ -864,7 +874,13 @@
                     return;
                 }
                 const parsed = JSON.parse(raw);
-                favoriteLocations = Array.isArray(parsed) ? parsed : [];
+                favoriteLocations = Array.isArray(parsed)
+                    ? parsed.map((location) => ({
+                        name: location.name,
+                        latitude: Number(location.latitude),
+                        longitude: Number(location.longitude),
+                    }))
+                    : [];
             } catch (_) {
                 favoriteLocations = [];
             }
@@ -872,6 +888,107 @@
 
         function saveFavoritesToStorage() {
             window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteLocations));
+        }
+
+        function clearFavoritesFromStorage() {
+            window.localStorage.removeItem(FAVORITES_STORAGE_KEY);
+        }
+
+        function getAuthHeaders() {
+            const token = getAuthToken();
+            return token ? { 'Authorization': `Bearer ${token}` } : {};
+        }
+
+        async function fetchFavoritesFromBackend() {
+            const backendApi = await resolveBackendApiEndpoint();
+            const payload = await fetchJson(`${backendApi}/favorites`, {
+                method: 'GET',
+                headers: {
+                    ...getAuthHeaders(),
+                },
+            });
+
+            return Array.isArray(payload.favorites)
+                ? payload.favorites.map((location) => ({
+                    name: location.name,
+                    latitude: Number(location.latitude),
+                    longitude: Number(location.longitude),
+                }))
+                : [];
+        }
+
+        async function addFavoriteToBackend(location) {
+            const backendApi = await resolveBackendApiEndpoint();
+            await fetchJson(`${backendApi}/favorites`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...getAuthHeaders(),
+                },
+                body: JSON.stringify({
+                    name: location.name,
+                    latitude: Number(location.latitude),
+                    longitude: Number(location.longitude),
+                }),
+            });
+        }
+
+        async function removeFavoriteFromBackend(location) {
+            const backendApi = await resolveBackendApiEndpoint();
+            await fetchJson(`${backendApi}/favorites?location_key=${encodeURIComponent(locationKey(location))}`, {
+                method: 'DELETE',
+                headers: {
+                    ...getAuthHeaders(),
+                },
+            });
+        }
+
+        async function migrateLocalFavoritesToBackend() {
+            const token = getAuthToken();
+            if (!token) {
+                return;
+            }
+
+            let localFavorites = [];
+            try {
+                const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+                localFavorites = raw ? JSON.parse(raw) : [];
+            } catch (_) {
+                localFavorites = [];
+            }
+
+            if (!Array.isArray(localFavorites) || localFavorites.length === 0) {
+                return;
+            }
+
+            for (const location of localFavorites) {
+                try {
+                    await addFavoriteToBackend(location);
+                } catch (_) {
+                    // Continue migrating remaining locations.
+                }
+            }
+
+            clearFavoritesFromStorage();
+        }
+
+        async function refreshFavoritesForCurrentUser() {
+            const token = getAuthToken();
+            if (!token) {
+                loadFavoritesFromStorage();
+                updateFavoriteStar();
+                renderFavoritesList();
+                return;
+            }
+
+            try {
+                favoriteLocations = await fetchFavoritesFromBackend();
+            } catch (_) {
+                favoriteLocations = [];
+            }
+
+            updateFavoriteStar();
+            renderFavoritesList();
         }
 
         function isFavoriteLocation(location) {
@@ -931,30 +1048,44 @@
             });
         }
 
-        function toggleCurrentLocationFavorite() {
+        async function toggleCurrentLocationFavorite() {
             const key = locationKey(currentLocation);
             const index = favoriteLocations.findIndex((fav) => locationKey(fav) === key);
+            const isAuthenticated = Boolean(getAuthToken());
 
-            if (index >= 0) {
-                favoriteLocations.splice(index, 1);
-            } else {
-                favoriteLocations.push({
-                    name: currentLocation.name,
-                    latitude: currentLocation.latitude,
-                    longitude: currentLocation.longitude,
-                });
+            try {
+                if (isAuthenticated) {
+                    if (index >= 0) {
+                        await removeFavoriteFromBackend(currentLocation);
+                    } else {
+                        await addFavoriteToBackend(currentLocation);
+                    }
+                    favoriteLocations = await fetchFavoritesFromBackend();
+                } else {
+                    if (index >= 0) {
+                        favoriteLocations.splice(index, 1);
+                    } else {
+                        favoriteLocations.push({
+                            name: currentLocation.name,
+                            latitude: currentLocation.latitude,
+                            longitude: currentLocation.longitude,
+                        });
+                    }
+                    saveFavoritesToStorage();
+                }
+
+                updateFavoriteStar();
+                renderFavoritesList();
+            } catch (error) {
+                showAuthMessage(`Could not update favorites: ${error.message}`, true);
             }
-
-            saveFavoritesToStorage();
-            updateFavoriteStar();
-            renderFavoritesList();
         }
 
         function setupFavoritesPanel() {
-            loadFavoritesFromStorage();
-            document.getElementById('favorite-toggle-button').addEventListener('click', toggleCurrentLocationFavorite);
-            updateFavoriteStar();
-            renderFavoritesList();
+            document.getElementById('favorite-toggle-button').addEventListener('click', () => {
+                toggleCurrentLocationFavorite();
+            });
+            refreshFavoritesForCurrentUser();
         }
 
         function setCurrentLocation(location, options = {}) {

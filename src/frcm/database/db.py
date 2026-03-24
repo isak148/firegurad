@@ -89,6 +89,21 @@ class Database:
             )
         """)
 
+        # Table for user favorite locations
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS user_favorite_locations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                location_key TEXT NOT NULL,
+                name TEXT NOT NULL,
+                latitude REAL NOT NULL,
+                longitude REAL NOT NULL,
+                created_at TEXT NOT NULL,
+                UNIQUE(user_id, location_key),
+                FOREIGN KEY (user_id) REFERENCES users(id)
+            )
+        """)
+
         # Create index for faster lookups
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_weather_hash 
@@ -113,6 +128,11 @@ class Database:
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_user_sessions_token
             ON user_sessions(token)
+        """)
+
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_user_favorites_user_id
+            ON user_favorite_locations(user_id)
         """)
         
         self.conn.commit()
@@ -402,6 +422,76 @@ class Database:
             "email": email,
             "created_at": created_at,
         }
+
+    def upsert_user_favorite_location(
+        self,
+        user_id: int,
+        location_key: str,
+        name: str,
+        latitude: float,
+        longitude: float,
+    ) -> dict:
+        """Create or update a user's favorite location."""
+        created_at = datetime.now(timezone.utc).isoformat()
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO user_favorite_locations (
+                user_id, location_key, name, latitude, longitude, created_at
+            )
+            VALUES (?, ?, ?, ?, ?, ?)
+            ON CONFLICT(user_id, location_key)
+            DO UPDATE SET
+                name = excluded.name,
+                latitude = excluded.latitude,
+                longitude = excluded.longitude
+            """,
+            (user_id, location_key, name.strip(), latitude, longitude, created_at),
+        )
+        self.conn.commit()
+
+        return {
+            "location_key": location_key,
+            "name": name.strip(),
+            "latitude": latitude,
+            "longitude": longitude,
+        }
+
+    def get_user_favorite_locations(self, user_id: int) -> list[dict]:
+        """Return all favorite locations for a user."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            SELECT location_key, name, latitude, longitude
+            FROM user_favorite_locations
+            WHERE user_id = ?
+            ORDER BY created_at DESC, id DESC
+            """,
+            (user_id,),
+        )
+        rows = cursor.fetchall()
+        return [
+            {
+                "location_key": row[0],
+                "name": row[1],
+                "latitude": row[2],
+                "longitude": row[3],
+            }
+            for row in rows
+        ]
+
+    def delete_user_favorite_location(self, user_id: int, location_key: str) -> bool:
+        """Delete a favorite location for a user by location key."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            DELETE FROM user_favorite_locations
+            WHERE user_id = ? AND location_key = ?
+            """,
+            (user_id, location_key),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
 
 
 # Global database instance
