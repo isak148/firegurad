@@ -80,9 +80,10 @@ class FrostClient:
                 'wind_speed'
             ]
         
-        # Format timestamps for Frost API (ISO 8601)
-        start_str = start_time.strftime('%Y-%m-%dT%H:%M:%S')
-        end_str = end_time.strftime('%Y-%m-%dT%H:%M:%S')
+        # Frost referencetime is most reliable at hour precision.
+        # Example from Frost docs: 2010-01-01T12
+        start_str = start_time.strftime('%Y-%m-%dT%H')
+        end_str = end_time.strftime('%Y-%m-%dT%H')
         
         # Prepare request parameters
         # Frost API uses nearest station to the given coordinates
@@ -107,9 +108,18 @@ class FrostClient:
             logger.error("Request to Frost API timed out")
             raise
         except requests.exceptions.HTTPError as e:
-            logger.error(f"HTTP error from Frost API: {e}")
+            response_text = ""
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    response_text = e.response.text
+                except Exception:
+                    response_text = ""
+
+            logger.error(f"HTTP error from Frost API: {e}. Response body: {response_text}")
             if hasattr(e, 'response') and e.response is not None and e.response.status_code == 401:
                 raise ValueError("Invalid Frost API client ID. Get one at https://frost.met.no/auth/requestCredentials.html")
+            if response_text:
+                raise ValueError(f"Frost API error: {response_text}")
             raise
         except requests.exceptions.RequestException as e:
             logger.error(f"Error fetching data from Frost API: {e}")
