@@ -8,6 +8,7 @@ services:
       - FRCM_HOST=0.0.0.0
       - FRCM_PORT=8000
       - FRCM_REQUIRE_HTTPS=False
+      - FRCM_DATABASE_PATH=/app/data/frcm_cache.db
     env_file:
       - .env
     volumes:
