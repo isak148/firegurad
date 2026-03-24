@@ -7,6 +7,7 @@ from typing import List, Optional
 import datetime
 import os
 import logging
+from pathlib import Path
 import requests
 from pydantic import BaseModel, Field
 
@@ -39,9 +40,23 @@ def _is_valid_email(email: str) -> bool:
     return bool(local and domain and "." in domain)
 
 
+def _resolve_database_path() -> str:
+    """Resolve database path with persistent default and backward compatibility."""
+    configured_path = os.environ.get("FRCM_DATABASE_PATH")
+    if configured_path:
+        return configured_path
+
+    legacy_path = Path("frcm_cache.db")
+    if legacy_path.exists():
+        return str(legacy_path)
+
+    data_dir = Path("data")
+    data_dir.mkdir(parents=True, exist_ok=True)
+    return str(data_dir / "frcm_cache.db")
+
+
 def _get_database() -> Database:
-    db_path = os.environ.get("FRCM_DATABASE_PATH", "frcm_cache.db")
-    return Database(db_path)
+    return Database(_resolve_database_path())
 
 
 async def get_authenticated_user(
@@ -564,8 +579,7 @@ async def get_stored_historical_data(
 ):
     """Get stored historical weather snapshots from local database, grouped by day."""
     try:
-        db_path = os.environ.get('FRCM_DATABASE_PATH', 'frcm_cache.db')
-        db = Database(db_path)
+        db = Database(_resolve_database_path())
         snapshots = db.get_historical_weather_data(location_name=location_name)
         db.close()
 

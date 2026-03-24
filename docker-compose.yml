@@ -1,13 +1,13 @@
 services:
   frcm-api:
     build: .
-    container_name: frcm-api
     ports:
       - "8000:8000"
     environment:
       - FRCM_HOST=0.0.0.0
       - FRCM_PORT=8000
       - FRCM_REQUIRE_HTTPS=False
+      - FRCM_DATABASE_PATH=/app/data/frcm_cache.db
     env_file:
       - .env
     volumes:
@@ -20,7 +20,6 @@ services:
   # Optional: MQTT broker for notifications
   mqtt-broker:
     image: eclipse-mosquitto:latest
-    container_name: frcm-mqtt
     ports:
       - "1883:1883"
       - "9001:9001"
@@ -37,7 +36,6 @@ services:
   # Web frontend service
   web:
     image: nginx:alpine
-    container_name: fireguard-web
     ports:
       - "80:80"
     volumes:

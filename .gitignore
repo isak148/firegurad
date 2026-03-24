@@ -68,6 +68,7 @@ db.sqlite3-journal
 
 # FRCM cache database
 frcm_cache.db
+!data/frcm_cache.db
 
 # Flask stuff:
 instance/
