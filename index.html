@@ -164,8 +164,13 @@
                         <i class="fa-solid fa-cloud-sun text-3xl text-blue-500 mr-3"></i>
                         <h3 class="text-2xl font-bold text-slate-900">Weather & Fire Risk Data</h3>
                     </div>
-                    <div id="weather-location" class="text-sm text-slate-500 font-medium">
-                        <i class="fa-solid fa-location-dot mr-1"></i><span id="weather-location-text">Bergen, Norway</span>
+                    <div id="weather-location" class="flex items-center gap-2 text-sm text-slate-500 font-medium">
+                        <button id="favorite-toggle-button" type="button" class="rounded p-1 transition hover:bg-yellow-50" title="Toggle favorite">
+                            <i id="favorite-toggle-icon" class="fa-regular fa-star text-slate-400"></i>
+                        </button>
+                        <span>
+                            <i class="fa-solid fa-location-dot mr-1"></i><span id="weather-location-text">Bergen, Norway</span>
+                        </span>
                     </div>
                 </div>
 
@@ -186,6 +191,8 @@
                     <p id="location-search-status" class="mt-2 text-xs text-slate-500">Type at least 2 letters to search locations.</p>
                 </div>
 
+                <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
+                <div class="lg:col-span-3">
                 <!-- Tab Navigation -->
                 <div class="flex border-b border-slate-200 mb-6">
                     <button id="tab-current" class="tab-button px-6 py-3 font-semibold transition-colors border-b-2 border-blue-500 text-blue-600" onclick="switchTab('current')">
@@ -310,6 +317,20 @@
                     <div class="mt-6 pt-6 border-t border-slate-200 text-xs text-slate-500 text-center">
                         Data provided by <a href="https://api.met.no" target="_blank" class="text-blue-600 hover:underline">MET Norway Weather API</a>
                     </div>
+                </div>
+
+                </div>
+                <aside class="lg:col-span-1 rounded-xl border border-slate-200 bg-slate-50 p-4 h-fit">
+                    <div class="mb-3 flex items-center justify-between">
+                        <h4 class="text-sm font-bold text-slate-800">Favorites</h4>
+                        <i class="fa-solid fa-star text-yellow-500"></i>
+                    </div>
+                    <p class="mb-3 text-xs text-slate-500">Save places for one-click selection.</p>
+                    <div id="favorites-empty" class="rounded border border-dashed border-slate-300 bg-white px-3 py-2 text-xs text-slate-500">
+                        No favorite places yet.
+                    </div>
+                    <div id="favorites-list" class="hidden space-y-2"></div>
+                </aside>
                 </div>
 
             </div>
@@ -826,8 +847,115 @@
             latitude: 60.3913,
             longitude: 5.3221
         };
+        const FAVORITES_STORAGE_KEY = 'fireguard.favoriteLocations';
+        let favoriteLocations = [];
         let locationSearchDebounceId = null;
         let latestLocationSearchRequest = 0;
+
+        function locationKey(location) {
+            return `${Number(location.latitude).toFixed(4)},${Number(location.longitude).toFixed(4)}`;
+        }
+
+        function loadFavoritesFromStorage() {
+            try {
+                const raw = window.localStorage.getItem(FAVORITES_STORAGE_KEY);
+                if (!raw) {
+                    favoriteLocations = [];
+                    return;
+                }
+                const parsed = JSON.parse(raw);
+                favoriteLocations = Array.isArray(parsed) ? parsed : [];
+            } catch (_) {
+                favoriteLocations = [];
+            }
+        }
+
+        function saveFavoritesToStorage() {
+            window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteLocations));
+        }
+
+        function isFavoriteLocation(location) {
+            const key = locationKey(location);
+            return favoriteLocations.some((fav) => locationKey(fav) === key);
+        }
+
+        function updateFavoriteStar() {
+            const icon = document.getElementById('favorite-toggle-icon');
+            const button = document.getElementById('favorite-toggle-button');
+            const isFavorite = isFavoriteLocation(currentLocation);
+
+            if (isFavorite) {
+                icon.className = 'fa-solid fa-star text-yellow-500';
+                button.title = 'Remove from favorites';
+            } else {
+                icon.className = 'fa-regular fa-star text-slate-400';
+                button.title = 'Add to favorites';
+            }
+        }
+
+        function renderFavoritesList() {
+            const listEl = document.getElementById('favorites-list');
+            const emptyEl = document.getElementById('favorites-empty');
+            listEl.innerHTML = '';
+
+            if (!favoriteLocations.length) {
+                listEl.classList.add('hidden');
+                emptyEl.classList.remove('hidden');
+                return;
+            }
+
+            emptyEl.classList.add('hidden');
+            listEl.classList.remove('hidden');
+
+            favoriteLocations.forEach((favorite) => {
+                const row = document.createElement('div');
+                const active = locationKey(favorite) === locationKey(currentLocation);
+                row.className = active
+                    ? 'flex items-center justify-between rounded border border-yellow-300 bg-yellow-50 px-3 py-2'
+                    : 'flex items-center justify-between rounded border border-slate-200 bg-white px-3 py-2';
+
+                const selectButton = document.createElement('button');
+                selectButton.type = 'button';
+                selectButton.className = 'min-w-0 flex-1 text-left';
+                selectButton.innerHTML = `<div class="truncate text-sm font-medium text-slate-800">${favorite.name}</div><div class="text-xs text-slate-500">${Number(favorite.latitude).toFixed(3)}, ${Number(favorite.longitude).toFixed(3)}</div>`;
+                selectButton.addEventListener('click', () => {
+                    setCurrentLocation(favorite);
+                });
+
+                const star = document.createElement('span');
+                star.className = active ? 'fa-solid fa-star text-yellow-500 ml-2' : 'fa-solid fa-star text-yellow-400 ml-2';
+
+                row.appendChild(selectButton);
+                row.appendChild(star);
+                listEl.appendChild(row);
+            });
+        }
+
+        function toggleCurrentLocationFavorite() {
+            const key = locationKey(currentLocation);
+            const index = favoriteLocations.findIndex((fav) => locationKey(fav) === key);
+
+            if (index >= 0) {
+                favoriteLocations.splice(index, 1);
+            } else {
+                favoriteLocations.push({
+                    name: currentLocation.name,
+                    latitude: currentLocation.latitude,
+                    longitude: currentLocation.longitude,
+                });
+            }
+
+            saveFavoritesToStorage();
+            updateFavoriteStar();
+            renderFavoritesList();
+        }
+
+        function setupFavoritesPanel() {
+            loadFavoritesFromStorage();
+            document.getElementById('favorite-toggle-button').addEventListener('click', toggleCurrentLocationFavorite);
+            updateFavoriteStar();
+            renderFavoritesList();
+        }
 
         function setCurrentLocation(location, options = {}) {
             const { reload = true } = options;
@@ -840,6 +968,8 @@
 
             const locationText = document.getElementById('weather-location-text');
             locationText.textContent = currentLocation.name;
+            updateFavoriteStar();
+            renderFavoritesList();
 
             if (!reload) {
                 return;
@@ -1787,6 +1917,7 @@
         // Load weather data when the page loads and start auto-refresh
         document.addEventListener('DOMContentLoaded', () => {
             setupAuthPanel();
+            setupFavoritesPanel();
             setupLocationSearch();
             setCurrentLocation(currentLocation, { reload: false });
             loadWeatherData();
