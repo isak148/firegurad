@@ -282,6 +282,8 @@ async def get_historical_data(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching historical data: {e}", exc_info=True)
         raise HTTPException(
