@@ -169,6 +169,13 @@ class FrostClient:
         detail = last_error_detail or (
             f"No available Frost time series found for element={element} in requested time range"
         )
+        if element == 'wind_speed':
+            logger.warning(
+                "No Frost wind_speed series found for requested range. "
+                "Proceeding with fallback wind_speed imputation in transform layer."
+            )
+            return {"data": []}
+
         raise ValueError(f"Frost API error: {detail}")
 
     def _resolve_nearest_source_id(self, latitude: float, longitude: float, element: Optional[str] = None) -> str:

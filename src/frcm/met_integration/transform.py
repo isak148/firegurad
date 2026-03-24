@@ -176,7 +176,7 @@ def transform_frost_to_weather_data(frost_response: Dict[str, Any]) -> WeatherDa
                 continue
 
         weather_data_points: List[WeatherDataPoint] = []
-        required_elements = {'air_temperature', 'relative_humidity', 'wind_speed'}
+        required_elements = {'air_temperature', 'relative_humidity'}
 
         for time_str in sorted(merged_by_time.keys()):
             values = merged_by_time[time_str]
@@ -190,7 +190,7 @@ def transform_frost_to_weather_data(frost_response: Dict[str, Any]) -> WeatherDa
                     timestamp=timestamp,
                     temperature=values['air_temperature'],
                     humidity=values['relative_humidity'],
-                    wind_speed=values['wind_speed']
+                    wind_speed=values.get('wind_speed', 0.0)
                 )
                 weather_data_points.append(data_point)
             except (ValueError, TypeError) as e:
