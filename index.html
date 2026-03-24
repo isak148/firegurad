@@ -690,7 +690,7 @@
 
         async function searchLocations(query) {
             const backendApi = await resolveBackendApiEndpoint();
-            const payload = await fetchJson(`${backendApi}/locations/search?q=${encodeURIComponent(query)}&limit=8`);
+            const payload = await fetchJson(`${backendApi}/locations/search?q=${encodeURIComponent(query)}&limit=8&country_code=NO`);
             return payload.locations || [];
         }
 

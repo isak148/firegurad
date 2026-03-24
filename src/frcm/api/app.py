@@ -55,7 +55,8 @@ async def health():
 @app.get("/locations/search")
 async def search_locations(
     q: str = Query(..., min_length=2, description="Location search query"),
-    limit: int = Query(8, ge=1, le=20, description="Maximum number of locations to return")
+    limit: int = Query(8, ge=1, le=20, description="Maximum number of locations to return"),
+    country_code: Optional[str] = Query("NO", min_length=2, max_length=2, description="Optional country code filter, defaults to NO")
 ):
     """Search locations from MET/Yr location catalog for use with forecasts."""
     try:
@@ -70,11 +71,16 @@ async def search_locations(
         payload = response.json()
         raw_locations = payload.get("_embedded", {}).get("location", [])
 
+        wanted_country = country_code.upper() if country_code else None
         locations = []
         for loc in raw_locations[:limit]:
             position = loc.get("position", {})
             country = loc.get("country", {})
             region = loc.get("region", {})
+            loc_country_code = country.get("id")
+
+            if wanted_country and loc_country_code and loc_country_code.upper() != wanted_country:
+                continue
 
             lat = position.get("lat")
             lon = position.get("lon")
@@ -85,12 +91,15 @@ async def search_locations(
                 "id": loc.get("id"),
                 "name": loc.get("name"),
                 "country": country.get("name"),
-                "country_code": country.get("id"),
+                "country_code": loc_country_code,
                 "region": region.get("name"),
                 "latitude": lat,
                 "longitude": lon,
                 "url_path": loc.get("urlPath"),
             })
+
+            if len(locations) >= limit:
+                break
 
         return {
             "query": q,
