@@ -13,6 +13,21 @@ from frcm.datamodel.model import WeatherData, WeatherDataPoint
 logger = logging.getLogger(__name__)
 
 
+def _normalize_frost_element_id(element_id: str) -> str:
+    """Map derived Frost element expressions to canonical model element IDs."""
+    if not element_id:
+        return ""
+
+    normalized = element_id.strip()
+    if normalized.startswith("mean(air_temperature"):
+        return "air_temperature"
+    if normalized.startswith("mean(relative_humidity"):
+        return "relative_humidity"
+    if normalized.startswith("mean(wind_speed"):
+        return "wind_speed"
+    return normalized
+
+
 def transform_met_to_weather_data(met_response: Dict[str, Any]) -> WeatherData:
     """
     Transform MET API JSON response to WeatherData format.
@@ -167,7 +182,7 @@ def transform_frost_to_weather_data(frost_response: Dict[str, Any]) -> WeatherDa
 
                 bucket = merged_by_time.setdefault(time_str, {})
                 for obs in observations:
-                    element_id = obs.get('elementId', '')
+                    element_id = _normalize_frost_element_id(obs.get('elementId', ''))
                     value = obs.get('value')
                     if value is not None:
                         bucket[element_id] = float(value)

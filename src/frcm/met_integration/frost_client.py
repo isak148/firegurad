@@ -37,6 +37,21 @@ class FrostClient:
     BASE_URL = "https://frost.met.no/observations/v0.jsonld"
     SOURCES_URL = "https://frost.met.no/sources/v0.jsonld"
     AVAILABLE_TS_URL = "https://frost.met.no/observations/availableTimeSeries/v0.jsonld"
+
+    ELEMENT_QUERY_VARIANTS = {
+        "air_temperature": [
+            "air_temperature",
+            "mean(air_temperature PT1H)",
+        ],
+        "relative_humidity": [
+            "relative_humidity",
+            "mean(relative_humidity PT1H)",
+        ],
+        "wind_speed": [
+            "wind_speed",
+            "mean(wind_speed PT1H)",
+        ],
+    }
     
     def __init__(self, client_id: str, user_agent: str = "firegurad/0.1.0 github.com/isak148/firegurad"):
         """
@@ -160,52 +175,58 @@ class FrostClient:
         end_str: str,
         element: str,
     ) -> Dict[str, Any]:
-        candidate_sources = self._resolve_candidate_source_ids(
-            latitude=latitude,
-            longitude=longitude,
-            start_str=start_str,
-            end_str=end_str,
-            element=element,
-        )
-
         last_error_detail = ""
-        for source_id in candidate_sources:
-            for use_hourly_resolution in (True, False):
-                params = {
-                    'referencetime': f'{start_str}/{end_str}',
-                    'elements': element,
-                    'sources': source_id,
-                }
-                if use_hourly_resolution:
-                    params['timeresolutions'] = 'PT1H'
 
-                try:
-                    payload = self._request_frost_json(self.BASE_URL, params)
-                    logger.info(
-                        f"Fetched element={element} from source={source_id} "
-                        f"(hourly={use_hourly_resolution}). Status code: 200"
-                    )
-                    return payload
-                except requests.exceptions.Timeout:
-                    logger.error("Request to Frost API timed out")
-                    raise
-                except FrostAPIError as e:
-                    if e.status_code == 401:
-                        raise ValueError("Invalid Frost API client ID. Get one at https://frost.met.no/auth/requestCredentials.html")
+        query_variants = self.ELEMENT_QUERY_VARIANTS.get(element, [element])
 
-                    # 412 means this source/parameter combination has no matching series.
-                    if e.status_code == 412:
-                        last_error_detail = str(e)
-                        logger.warning(
-                            f"No timeseries for element={element}, source={source_id}, "
-                            f"hourly={use_hourly_resolution}. Trying fallback."
+        for requested_element in query_variants:
+            candidate_sources = self._resolve_candidate_source_ids(
+                latitude=latitude,
+                longitude=longitude,
+                start_str=start_str,
+                end_str=end_str,
+                element=requested_element,
+            )
+
+            for source_id in candidate_sources:
+                for use_hourly_resolution in (True, False):
+                    params = {
+                        'referencetime': f'{start_str}/{end_str}',
+                        'elements': requested_element,
+                        'sources': source_id,
+                    }
+                    if use_hourly_resolution:
+                        params['timeresolutions'] = 'PT1H'
+
+                    try:
+                        payload = self._request_frost_json(self.BASE_URL, params)
+                        logger.info(
+                            f"Fetched requested_element={requested_element} "
+                            f"(canonical={element}) from source={source_id} "
+                            f"(hourly={use_hourly_resolution}). Status code: 200"
                         )
-                        continue
+                        return payload
+                    except requests.exceptions.Timeout:
+                        logger.error("Request to Frost API timed out")
+                        raise
+                    except FrostAPIError as e:
+                        if e.status_code == 401:
+                            raise ValueError("Invalid Frost API client ID. Get one at https://frost.met.no/auth/requestCredentials.html")
 
-                    raise ValueError(str(e))
-                except requests.exceptions.RequestException as e:
-                    logger.error(f"Error fetching data from Frost API: {e}")
-                    raise
+                        # 412 means this source/parameter combination has no matching series.
+                        if e.status_code == 412:
+                            last_error_detail = str(e)
+                            logger.warning(
+                                f"No timeseries for requested_element={requested_element} "
+                                f"(canonical={element}), source={source_id}, "
+                                f"hourly={use_hourly_resolution}. Trying fallback."
+                            )
+                            continue
+
+                        raise ValueError(str(e))
+                    except requests.exceptions.RequestException as e:
+                        logger.error(f"Error fetching data from Frost API: {e}")
+                        raise
 
         detail = last_error_detail or (
             f"No available Frost time series found for element={element} in requested time range"
