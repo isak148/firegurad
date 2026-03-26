@@ -1499,11 +1499,41 @@
             }
         }
 
+        async function resolveHourlyForecastWithModel(timeseries) {
+            try {
+                const backendApi = await resolveBackendApiEndpoint();
+                const url = `${backendApi}/risk/forecast?latitude=${encodeURIComponent(currentLocation.latitude)}&longitude=${encodeURIComponent(currentLocation.longitude)}&days=1`;
+                const apiData = await fetchJson(url);
+
+                if (!apiData || !Array.isArray(apiData.fire_risk)) {
+                    return null;
+                }
+
+                // Create a map of timestamp -> custom model TTF
+                const ttfByTimestamp = new Map();
+                apiData.fire_risk.forEach(item => {
+                   if (item.timestamp && typeof item.ttf === 'number') {
+                       // normalize to ISO string just in case
+                       const d = new Date(item.timestamp);
+                       if (!isNaN(d)) {
+                           ttfByTimestamp.set(d.toISOString(), item.ttf);
+                       }
+                   }
+                });
+                
+                return ttfByTimestamp;
+
+            } catch (err) {
+                console.warn("Could not fetch hourly model TTF, falling back to approximation", err);
+                return null;
+            }
+        }
+
         /**
          * Updates the UI with weather data
          * @param {Object} weatherData - Parsed weather data
          */
-        function updateWeatherDisplay(weatherData, modelTTF, rawData) {
+        async function updateWeatherDisplay(weatherData, modelTTF, rawData) {
             // Update temperature
             document.getElementById('temperature-value').textContent = 
                 `${weatherData.temperature.toFixed(1)}°C`;
@@ -1547,16 +1577,27 @@
             const hourlyContainer = document.getElementById('hourly-forecast-container');
             if (hourlyContainer && rawData && rawData.properties && rawData.properties.timeseries) {
                 const timeseries = rawData.properties.timeseries.slice(0, 24);
+                
+                // Fetch the actual model TTF values for the next 24 hours to replace the simplified estimate
+                const hourlyModelTTFMap = await resolveHourlyForecastWithModel(timeseries);
+
                 let rowsHtml = '';
                 
                 timeseries.forEach(entry => {
-                    const time = new Date(entry.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    const timeObj = new Date(entry.time);
+                    const time = timeObj.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
                     const instant = entry.data.instant.details;
                     const temp = instant.air_temperature;
                     const hum = instant.relative_humidity;
                     const wind = instant.wind_speed;
-                    // Use simplified estimate since current MET API response lacks computed TTF per hour
-                    const ttfEst = calculateSimplifiedTTF(temp, hum, wind);
+                    
+                    // Try to get the real model TTF from the backend lookup, fallback to simplified ONLY if API fails
+                    let ttfEst;
+                    if (hourlyModelTTFMap && hourlyModelTTFMap.has(timeObj.toISOString())) {
+                        ttfEst = hourlyModelTTFMap.get(timeObj.toISOString());
+                    } else {
+                        ttfEst = calculateSimplifiedTTF(temp, hum, wind);
+                    }
                     
                     let bg = 'bg-green-100';
                     let text = 'text-green-700';
@@ -1576,7 +1617,7 @@
                             <td class="py-3 px-4 text-sm text-slate-600 text-left border-b border-slate-100">${wind.toFixed(1)} m/s</td>
                             <td class="py-3 px-4 text-sm text-left border-b border-slate-100">
                                 <span class="px-2 py-1 rounded-full font-semibold ${bg} ${text} text-xs">
-                                    ${ttfEst.toFixed(1)} min
+                                    ${ttfEst.toFixed(1)} min ${!hourlyModelTTFMap || !hourlyModelTTFMap.has(timeObj.toISOString()) ? '(est)' : ''}
                                 </span>
                             </td>
                         </tr>
@@ -1619,7 +1660,7 @@
                     currentLocation.longitude
                 );
 
-                updateWeatherDisplay(weatherData, modelTTF, rawData);
+                await updateWeatherDisplay(weatherData, modelTTF, rawData);
             } catch (error) {
                 console.error('Failed to load weather data:', error);
                 
