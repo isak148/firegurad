@@ -1159,22 +1159,33 @@
                 return;
             }
 
+            // Immediately mark data as unloaded to allow refetch
             window.historicDataLoaded = false;
             window.futureDataLoaded = false;
             window.graphDataLoaded = false;
 
+            // Load main current data
             loadWeatherData();
 
+            // Refresh visible tabs instead of letting it reload blankly on switching
             const isHistoricOpen = !document.getElementById('content-historic').classList.contains('hidden');
             const isFutureOpen = !document.getElementById('content-future').classList.contains('hidden');
             const isGraphOpen = document.getElementById('content-graph') && !document.getElementById('content-graph').classList.contains('hidden');
 
             if (isHistoricOpen) {
                 loadHistoricData();
+            } else {
+                // Pre-clear DOM so we don't show old data if clicked
+                document.getElementById('historic-data-container').innerHTML = '';
             }
+            
             if (isFutureOpen) {
                 loadFutureData();
+            } else {
+                // Pre-clear DOM so we don't show old data if clicked
+                document.getElementById('future-data-container').innerHTML = '';
             }
+            
             if (isGraphOpen) {
                 loadGraphData();
             }
@@ -1717,8 +1728,10 @@
                 }
             });
 
-            // Load data for the selected tab if not already loaded
+            // If the user clicks a tab and we already HAVE the DOM data, don't throw away the current UI by reloading!
+            // We only force a reload if window.historicDataLoaded is explicitly FALSE.
             if (tabName === 'historic' && !window.historicDataLoaded) {
+                // If there's already old data in there, keep showing it while we load the new stuff instead of blanking out
                 loadHistoricData();
             } else if (tabName === 'future' && !window.futureDataLoaded) {
                 loadFutureData();
@@ -1737,10 +1750,12 @@
             const containerEl = document.getElementById('historic-data-container');
             
             try {
-                // Show loading
-                loadingEl.classList.remove('hidden');
+                // If container already has children, keep showing it while fetching
+                if (containerEl.children.length === 0) {
+                    loadingEl.classList.remove('hidden');
+                    dataEl.classList.add('hidden');
+                }
                 errorEl.classList.add('hidden');
-                dataEl.classList.add('hidden');
                 
                 // Fetch historical observations from MET via backend API
                 console.log('Fetching historical data from MET backend API...');
@@ -1749,6 +1764,10 @@
 
                 const apiData = await fetchJson(url);
                 console.log('Received historical data:', apiData);
+
+                if (!apiData || !apiData.weather_data || !apiData.fire_risk) {
+                    throw new Error("Invalid API response format");
+                }
 
                 const groupedDays = mapHistoricalResponseToDays(apiData);
                 
@@ -1929,10 +1948,12 @@
             const containerEl = document.getElementById('future-data-container');
             
             try {
-                // Show loading
-                loadingEl.classList.remove('hidden');
+                // If container already has children, keep showing it while fetching
+                if (containerEl.children.length === 0) {
+                    loadingEl.classList.remove('hidden');
+                    dataEl.classList.add('hidden');
+                }
                 errorEl.classList.add('hidden');
-                dataEl.classList.add('hidden');
                 
                 // Fetch forecast weather+TTF from backend model API
                 const backendApi = await resolveBackendApiEndpoint();
@@ -2196,9 +2217,11 @@
             const dataEl = document.getElementById('graph-data');
             
             try {
-                loadingEl.classList.remove('hidden');
+                if (!ttfChartInstance) {
+                    loadingEl.classList.remove('hidden');
+                    dataEl.classList.add('hidden');
+                }
                 errorEl.classList.add('hidden');
-                dataEl.classList.add('hidden');
                 
                 const backendApi = await resolveBackendApiEndpoint();
                 
