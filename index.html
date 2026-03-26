@@ -6,6 +6,7 @@
     <title>FireGuard | Intelligent Cloud Safety</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
         body { font-family: 'Inter', sans-serif; }
@@ -194,15 +195,18 @@
                 <div class="grid grid-cols-1 gap-6 lg:grid-cols-4">
                 <div class="lg:col-span-3">
                 <!-- Tab Navigation -->
-                <div class="flex border-b border-slate-200 mb-6">
-                    <button id="tab-current" class="tab-button px-6 py-3 font-semibold transition-colors border-b-2 border-blue-500 text-blue-600" onclick="switchTab('current')">
+                <div class="flex border-b border-slate-200 mb-6 overflow-x-auto">
+                    <button id="tab-current" class="tab-button whitespace-nowrap px-6 py-3 font-semibold transition-colors border-b-2 border-blue-500 text-blue-600" onclick="switchTab('current')">
                         <i class="fa-solid fa-clock mr-2"></i>Current
                     </button>
-                    <button id="tab-historic" class="tab-button px-6 py-3 font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-700" onclick="switchTab('historic')">
+                    <button id="tab-historic" class="tab-button whitespace-nowrap px-6 py-3 font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-700" onclick="switchTab('historic')">
                         <i class="fa-solid fa-clock-rotate-left mr-2"></i>Historic
                     </button>
-                    <button id="tab-future" class="tab-button px-6 py-3 font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-700" onclick="switchTab('future')">
+                    <button id="tab-future" class="tab-button whitespace-nowrap px-6 py-3 font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-700" onclick="switchTab('future')">
                         <i class="fa-solid fa-calendar-days mr-2"></i>Future
+                    </button>
+                    <button id="tab-graph" class="tab-button whitespace-nowrap px-6 py-3 font-semibold transition-colors border-b-2 border-transparent text-slate-500 hover:text-slate-700" onclick="switchTab('graph')">
+                        <i class="fa-solid fa-chart-line mr-2"></i>Graph
                     </button>
                 </div>
                 
@@ -218,7 +222,8 @@
                         <p class="text-slate-600" id="error-message">Failed to load weather data</p>
                     </div>
 
-                    <div id="weather-data" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div id="weather-data" class="hidden">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                     <!-- Temperature -->
                     <div class="bg-gradient-to-br from-red-50 to-orange-50 p-6 rounded-xl border border-red-100">
                         <div class="flex items-center justify-between mb-3">
@@ -257,6 +262,28 @@
                         </div>
                         <div class="text-3xl font-bold text-slate-900" id="ttf-value">--</div>
                         <div class="text-sm text-slate-600 mt-1">Time to Flashover (min)</div>
+                    </div>
+                </div>
+
+                    <!-- Hourly Data Table -->
+                    <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                        <h4 class="font-bold text-slate-900 mb-4 text-lg">Hourly Forecast (Next 24 Hours)</h4>
+                        <div class="overflow-x-auto max-h-96 overflow-y-auto">
+                            <table class="min-w-full text-left">
+                                <thead class="sticky top-0 bg-white">
+                                    <tr class="border-b border-slate-200 text-slate-500 text-xs uppercase tracking-wider">
+                                        <th class="py-3 px-4 font-semibold bg-white">Time</th>
+                                        <th class="py-3 px-4 font-semibold bg-white">Temperature</th>
+                                        <th class="py-3 px-4 font-semibold bg-white">Humidity</th>
+                                        <th class="py-3 px-4 font-semibold bg-white">Wind</th>
+                                        <th class="py-3 px-4 font-semibold bg-white">Approx Risk (TTF)</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="hourly-forecast-container" class="divide-y divide-slate-100">
+                                    <!-- Hourly rows will be injected here -->
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
 
@@ -316,6 +343,32 @@
 
                     <div class="mt-6 pt-6 border-t border-slate-200 text-xs text-slate-500 text-center">
                         Data provided by <a href="https://api.met.no" target="_blank" class="text-blue-600 hover:underline">MET Norway Weather API</a>
+                    </div>
+                </div>
+
+                <!-- Graph Tab Content -->
+                <div id="content-graph" class="tab-content hidden">
+                    <div id="graph-loading" class="text-center py-8">
+                        <i class="fa-solid fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
+                        <p class="text-slate-600">Loading graph data...</p>
+                    </div>
+
+                    <div id="graph-error" class="hidden text-center py-8">
+                        <i class="fa-solid fa-exclamation-triangle text-3xl text-red-500 mb-3"></i>
+                        <p class="text-slate-600" id="graph-error-message">Failed to load graph data</p>
+                    </div>
+
+                    <div id="graph-data" class="hidden">
+                        <div class="mb-6">
+                            <p class="text-slate-600 text-sm mb-4">Fire Risk (TTF) - Past 3 Days & Future 3 Days</p>
+                        </div>
+                        <div class="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
+                            <canvas id="ttfChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="mt-6 pt-6 border-t border-slate-200 text-xs text-slate-500 text-center">
+                        Historical and forecast fire risk data modeling.
                     </div>
                 </div>
 
@@ -1108,17 +1161,22 @@
 
             window.historicDataLoaded = false;
             window.futureDataLoaded = false;
+            window.graphDataLoaded = false;
 
             loadWeatherData();
 
             const isHistoricOpen = !document.getElementById('content-historic').classList.contains('hidden');
             const isFutureOpen = !document.getElementById('content-future').classList.contains('hidden');
+            const isGraphOpen = document.getElementById('content-graph') && !document.getElementById('content-graph').classList.contains('hidden');
 
             if (isHistoricOpen) {
                 loadHistoricData();
             }
             if (isFutureOpen) {
                 loadFutureData();
+            }
+            if (isGraphOpen) {
+                loadGraphData();
             }
         }
 
@@ -1445,7 +1503,7 @@
          * Updates the UI with weather data
          * @param {Object} weatherData - Parsed weather data
          */
-        function updateWeatherDisplay(weatherData, modelTTF) {
+        function updateWeatherDisplay(weatherData, modelTTF, rawData) {
             // Update temperature
             document.getElementById('temperature-value').textContent = 
                 `${weatherData.temperature.toFixed(1)}°C`;
@@ -1485,6 +1543,48 @@
             document.getElementById('last-updated').textContent = 
                 `Last updated: ${timestamp.toLocaleString()}`;
             
+            // Build hourly forecast table
+            const hourlyContainer = document.getElementById('hourly-forecast-container');
+            if (hourlyContainer && rawData && rawData.properties && rawData.properties.timeseries) {
+                const timeseries = rawData.properties.timeseries.slice(0, 24);
+                let rowsHtml = '';
+                
+                timeseries.forEach(entry => {
+                    const time = new Date(entry.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                    const instant = entry.data.instant.details;
+                    const temp = instant.air_temperature;
+                    const hum = instant.relative_humidity;
+                    const wind = instant.wind_speed;
+                    // Use simplified estimate since current MET API response lacks computed TTF per hour
+                    const ttfEst = calculateSimplifiedTTF(temp, hum, wind);
+                    
+                    let bg = 'bg-green-100';
+                    let text = 'text-green-700';
+                    if (ttfEst < TTF_VERY_HIGH_RISK) {
+                        bg = 'bg-red-100';
+                        text = 'text-red-700';
+                    } else if (ttfEst <= TTF_HIGH_RISK) {
+                        bg = 'bg-yellow-100';
+                        text = 'text-yellow-700';
+                    }
+                    
+                    rowsHtml += `
+                        <tr class="hover:bg-slate-50 transition-colors">
+                            <td class="py-3 px-4 text-sm text-slate-700 whitespace-nowrap text-left border-b border-slate-100">${time}</td>
+                            <td class="py-3 px-4 text-sm font-medium text-slate-900 text-left border-b border-slate-100">${temp.toFixed(1)}°C</td>
+                            <td class="py-3 px-4 text-sm text-slate-600 text-left border-b border-slate-100">${hum.toFixed(1)}%</td>
+                            <td class="py-3 px-4 text-sm text-slate-600 text-left border-b border-slate-100">${wind.toFixed(1)} m/s</td>
+                            <td class="py-3 px-4 text-sm text-left border-b border-slate-100">
+                                <span class="px-2 py-1 rounded-full font-semibold ${bg} ${text} text-xs">
+                                    ${ttfEst.toFixed(1)} min
+                                </span>
+                            </td>
+                        </tr>
+                    `;
+                });
+                hourlyContainer.innerHTML = rowsHtml;
+            }
+
             // Show weather data, hide loading
             document.getElementById('weather-loading').classList.add('hidden');
             document.getElementById('weather-error').classList.add('hidden');
@@ -1519,7 +1619,7 @@
                     currentLocation.longitude
                 );
 
-                updateWeatherDisplay(weatherData, modelTTF);
+                updateWeatherDisplay(weatherData, modelTTF, rawData);
             } catch (error) {
                 console.error('Failed to load weather data:', error);
                 
@@ -1556,11 +1656,11 @@
 
         /**
          * Switch between tabs
-         * @param {string} tabName - Name of the tab to switch to ('current', 'historic', 'future')
+         * @param {string} tabName - Name of the tab to switch to ('current', 'historic', 'future', 'graph')
          */
         function switchTab(tabName) {
             // Update tab buttons
-            const tabs = ['current', 'historic', 'future'];
+            const tabs = ['current', 'historic', 'future', 'graph'];
             tabs.forEach(tab => {
                 const button = document.getElementById(`tab-${tab}`);
                 const content = document.getElementById(`content-${tab}`);
@@ -1581,6 +1681,8 @@
                 loadHistoricData();
             } else if (tabName === 'future' && !window.futureDataLoaded) {
                 loadFutureData();
+            } else if (tabName === 'graph' && !window.graphDataLoaded) {
+                loadGraphData();
             }
         }
 
@@ -2043,6 +2145,139 @@
             `;
             
             return card;
+        }
+
+        let ttfChartInstance = null;
+
+        async function loadGraphData() {
+            const loadingEl = document.getElementById('graph-loading');
+            const errorEl = document.getElementById('graph-error');
+            const dataEl = document.getElementById('graph-data');
+            
+            try {
+                loadingEl.classList.remove('hidden');
+                errorEl.classList.add('hidden');
+                dataEl.classList.add('hidden');
+                
+                const backendApi = await resolveBackendApiEndpoint();
+                
+                // Fetch 3 days of historical and 3 days of forecast
+                const histUrl = `${backendApi}/historical?latitude=${encodeURIComponent(currentLocation.latitude)}&longitude=${encodeURIComponent(currentLocation.longitude)}&days=3`;
+                const futUrl = `${backendApi}/risk/forecast?latitude=${encodeURIComponent(currentLocation.latitude)}&longitude=${encodeURIComponent(currentLocation.longitude)}&days=3`;
+                
+                const [histRes, futRes] = await Promise.all([
+                    fetchJson(histUrl).catch(() => ({ fire_risk: [] })),
+                    fetchJson(futUrl).catch(() => ({ fire_risk: [] }))
+                ]);
+                
+                const pastRisk = Array.isArray(histRes.fire_risk) ? histRes.fire_risk : [];
+                const futureRisk = Array.isArray(futRes.fire_risk) ? futRes.fire_risk : [];
+                
+                // Merge and deduplicate by timestamp
+                const riskMap = new Map();
+                pastRisk.forEach(item => {
+                    if (item.timestamp && typeof item.ttf === 'number') {
+                        riskMap.set(item.timestamp, item.ttf);
+                    }
+                });
+                futureRisk.forEach(item => {
+                    if (item.timestamp && typeof item.ttf === 'number') {
+                        riskMap.set(item.timestamp, item.ttf);
+                    }
+                });
+                
+                const combinedData = Array.from(riskMap.entries())
+                    .map(([ts, ttf]) => ({ timestamp: ts, ttf }))
+                    .sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+                
+                if (combinedData.length === 0) {
+                    throw new Error("No fire risk data available for the ±3 day window.");
+                }
+                
+                renderGraph(combinedData);
+                
+                window.graphDataLoaded = true;
+                loadingEl.classList.add('hidden');
+                dataEl.classList.remove('hidden');
+                
+            } catch (error) {
+                console.error('Failed to load graph data:', error);
+                document.getElementById('graph-error-message').textContent = `Failed to load graph data: ${error.message}`;
+                loadingEl.classList.add('hidden');
+                errorEl.classList.remove('hidden');
+            }
+        }
+
+        function renderGraph(data) {
+            const canvas = document.getElementById('ttfChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const labels = data.map(d => {
+                const date = new Date(d.timestamp);
+                return date.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+            });
+            const values = data.map(d => Math.max(0, d.ttf)); // Prevent negative values from looking odd
+            
+            if (ttfChartInstance) {
+                ttfChartInstance.destroy();
+            }
+            
+            ttfChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Time to Flashover (TTF) - Minutes',
+                        data: values,
+                        borderColor: '#ef4444',
+                        backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 2,
+                        pointHoverRadius: 5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false,
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 12,
+                                maxRotation: 45,
+                                minRotation: 45
+                            },
+                            grid: {
+                                display: false
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Minutes'
+                            }
+                        }
+                    },
+                    plugins: {
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'TTF: ' + context.parsed.y.toFixed(1) + ' min';
+                                }
+                            }
+                        },
+                        legend: {
+                            display: false
+                        }
+                    }
+                }
+            });
         }
 
         // Load weather data when the page loads and start auto-refresh
