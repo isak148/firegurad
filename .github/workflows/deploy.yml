@@ -26,4 +26,5 @@ jobs:
             cd my-website
             git pull origin main
             docker-compose up --build -d
+            docker compose up -d --force-recreate
             docker image prune -f
