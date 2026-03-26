@@ -23,7 +23,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             set -e
-            cd /path/to/your/project
+            cd my-website
             git pull origin main
             docker-compose up --build -d
             docker image prune -f
