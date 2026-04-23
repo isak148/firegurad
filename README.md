@@ -2,8 +2,8 @@
 
 ## Introduction
 
-FireGuard is a containerized web application designed to monitor and analyze fire risk using weather data and predictive calculations. The system consists of a lightweight web interface and a Python-based backend API, allowing users to access fire risk information directly through their browser.
-The application is built using Docker to ensure a consistent and easy setup across different environments. All components run in isolated containers, making the system simple to deploy and run locally.
+FireGuard is a web application designed to monitor and analyze fire risk using weather data and predictive calculations. The system consists of a lightweight web interface and a Python-based backend API, allowing users to access fire risk information through their browser.
+The application is built using Docker to ensure a easy setup across different environments. All components run in containers, making the system easy to run locally.
 
 ## Prerequisites
 
