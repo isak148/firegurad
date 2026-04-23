@@ -20,7 +20,7 @@ docker --version
 
 ### Git
 - **Purpose**: Used to download the source code from GitHub
-- **Install**: (https://git-scm.com/download/)
+- **Install**: https://git-scm.com/download/
 - **Verify**:
   
 ```bash
