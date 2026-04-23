@@ -1,49 +1,80 @@
-Prerequisites
-In order to run FireGuard locally, you need: 
-Docker, runs the entire system in containers
-Install: https://www.docker.com/products/docker-desktop/
-Verify installation (in cmd)
+# FireGuard
+
+## Prerequisites
+
+Before running FireGuard locally, ensure you have the following installed:
+
+### Docker
+- **Purpose**: Runs the entire system in containers
+- **Install**: https://www.docker.com/products/docker-desktop/
+- **Verify**: 
+  ```bash
 docker --version
 docker compose version
-Git, used to download the source code from GitHub
+  ```
+
+### Git
+- **Purpose**: Used to download the source code from GitHub
+- **Verify**:
+  ```bash
 git --version
+  ```
 
-Installation
-These step shows how to set up and run fireguard locally. Note that the prerequisites must be installed
-1.	Clone the repo
+## Installation
+
+Follow these steps to set up and run FireGuard locally:
+
+1. **Clone the repository**
+   ```bash
 git clone https://github.com/isak148/firegurad.git
-2.	Navigate to folder
+   ```
 
-Cd firegurad
-3.	Copy the example configuration
+2. **Navigate to the project folder**
+   ```bash
+cd firegurad
+   ```
+
+3. **Copy the example configuration**
+   ```bash
 cp .env.example .env
+   ```
 
-4.	Configure variables 
+4. **Configure environment variables**
+   ```bash
+nano .env
+   ```
 
-nano .env 
-5.	Build the application
-
+5. **Build the application**
+   ```bash
 docker compose build
+   ```
 
-6.	Start the application
-
+6. **Start the application**
+   ```bash
 docker compose up -d
+   ```
 
-7.	Open in browser
-http://localhost/
+7. **Open in browser**
+   - http://localhost/
 
-Usage
-FireGuard is a containerized full-stack web application consisting of a frontend, a backend API, and supporting infrastructure managed by Docker.
-The frontend is served using Nginx, a lightweight web server.
-The backend is a Python-based API service. it processes all application logic (e.g., fire risk calculations and weather data handling)
-The user interacts with the system through a web browser. The browser loads the website from Nginx
-Docker is used to run and connect all services. each component runs in its own isolated container.
+## Usage
 
-Limitations
-•	No HTTPS
-•	Requires Docker
-•	Limited authentication
-•	SQLite (Small database)
-•	No logging
-•	No automated startup
+FireGuard is a containerized full-stack web application with the following architecture:
 
+- **Frontend**: Served using Nginx, a lightweight web server
+- **Backend**: Python-based API service that processes application logic (fire risk calculations, weather data handling)
+- **User Interaction**: Users interact with the system through a web browser
+- **Infrastructure**: Docker manages and connects all services, with each component running in its own isolated container
+
+## Limitations
+
+- No HTTPS support
+- Requires Docker
+- Limited authentication
+- SQLite database (small scale)
+- No logging system
+- No automated startup
+
+---
+
+For issues or contributions, please visit the [GitHub repository](https://github.com/isak148/firegurad).
