@@ -13,7 +13,7 @@ docker --version
 docker compose version
   ```
 
-### Git
+Git
 - **Purpose**: Used to download the source code from GitHub
 - **Verify**:
   ```bash
