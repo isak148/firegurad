@@ -9,9 +9,8 @@ Before running FireGuard locally, ensure you have the following installed:
 - **Install**: https://www.docker.com/products/docker-desktop/
 - **Verify**:
   
-```bask
+```bash
 docker --version
-docker compose version
 ```
 
 ### Git
@@ -25,34 +24,34 @@ git --version
 Follow these steps to set up and run FireGuard locally:
 
 1. **Clone the repository**
-   ```bash
+ ```bash
 git clone https://github.com/isak148/firegurad.git
-   ```
+ ```
 
 2. **Navigate to the project folder**
-   ```bash
+```bash
 cd firegurad
-   ```
+```
 
 3. **Copy the example configuration**
-   ```bash
+```bash
 cp .env.example .env
-   ```
+```
 
 4. **Configure environment variables**
-   ```bash
+```bash
 nano .env
-   ```
+```
 
 5. **Build the application**
-   ```bash
+```bash
 docker compose build
-   ```
+```
 
 6. **Start the application**
-   ```bash
+```bash
 docker compose up -d
-   ```
+```
 
 7. **Open in browser**
    - http://localhost/
