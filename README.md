@@ -69,6 +69,8 @@ docker compose up -d
 7. **Open in browser**
    - http://localhost/
 
+Fireguard should now be running, see configuration (point 4) if problems with connection.
+
 ## Usage
 
 FireGuard is a containerized full-stack web application with the following architecture:
