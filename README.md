@@ -27,11 +27,14 @@ docker --version
 git --version
 ```
 
-Before installation Docker needs to be RUNNING!
+
 
 ## Installation
 
+
 Follow these steps to set up and run FireGuard locally:
+
+#### Before installation Docker needs to be RUNNING!
 
 1. **Clone the repository**
  ```bash
