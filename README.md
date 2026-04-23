@@ -26,6 +26,9 @@ docker --version
 ```bash
 git --version
 ```
+
+Before installation Docker needs to be RUNNING!
+
 ## Installation
 
 Follow these steps to set up and run FireGuard locally:
@@ -45,7 +48,7 @@ cd firegurad
 cp .env.example .env
 ```
 
-4. **Configure environment variables**
+4. **Configure environment variables** (Not neccesary when using locally)
 ```bash
 nano .env
 ```
