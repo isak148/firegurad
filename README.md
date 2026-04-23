@@ -16,9 +16,8 @@ docker compose version
 ### Git
 - **Purpose**: Used to download the source code from GitHub
 - **Verify**:
+git --version  ```
 
-  ```
-git --version
 
   ```
 
