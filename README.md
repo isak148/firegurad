@@ -9,9 +9,10 @@ Before running FireGuard locally, ensure you have the following installed:
 - **Install**: https://www.docker.com/products/docker-desktop/
 - **Verify**:
   
-bash
+```bask
 docker --version
 docker compose version
+```
 
 ### Git
 - **Purpose**: Used to download the source code from GitHub
