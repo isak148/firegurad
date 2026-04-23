@@ -18,7 +18,7 @@ docker compose version
 - **Verify**:
 ```bash
 git --version
-
+```
 ## Installation
 
 Follow these steps to set up and run FireGuard locally:
